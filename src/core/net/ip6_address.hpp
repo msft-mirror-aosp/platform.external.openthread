@@ -40,16 +40,22 @@
 
 #include <openthread/ip6.h>
 
+#include "common/as_core_type.hpp"
 #include "common/clearable.hpp"
 #include "common/encoding.hpp"
 #include "common/equatable.hpp"
 #include "common/string.hpp"
 #include "mac/mac_types.hpp"
-#include "net/ip4_address.hpp"
 
 using ot::Encoding::BigEndian::HostSwap16;
 
 namespace ot {
+
+namespace Ip4 {
+// Forward declaration for SynthesizeFromIp4Address
+class Address;
+} // namespace Ip4
+
 namespace Ip6 {
 
 /**
@@ -110,6 +116,14 @@ public:
     const uint8_t *GetBytes(void) const { return mPrefix.mFields.m8; }
 
     /**
+     * This method gets the subnet ID of the prefix.
+     *
+     * @returns The 16-bit subnet ID.
+     *
+     */
+    uint16_t GetSubnetId(void) const { return HostSwap16(mPrefix.mFields.m16[3]); }
+
+    /**
      * This method gets the prefix length (in bits).
      *
      * @returns The prefix length (in bits).
@@ -141,6 +155,14 @@ public:
      *
      */
     void Set(const NetworkPrefix &aNetworkPrefix) { Set(aNetworkPrefix.m8, NetworkPrefix::kLength); }
+
+    /**
+     * This method sets the subnet ID of the prefix.
+     *
+     * @param[in] aSubnetId  A 16-bit subnet ID.
+     *
+     */
+    void SetSubnetId(uint16_t aSubnetId) { mPrefix.mFields.m16[3] = HostSwap16(aSubnetId); }
 
     /**
      * This method set the prefix length.
@@ -249,8 +271,10 @@ public:
     /**
      * This method overloads operator `<` to compare two prefixes.
      *
-     * A prefix with shorter length is considered smaller than the one with longer length. If the prefix lengths are
-     * equal, then the prefix bytes are compared directly.
+     * If the two prefixes have the same length N, then the bytes are compared directly (as two big-endian N-bit
+     * numbers). If the two prefix have different lengths, the shorter prefix is padded by `0` bit up to the longer
+     * prefix length N before the bytes are compared (as big-endian N-bit numbers). If all bytes are equal, the prefix
+     * with shorter length is considered smaller.
      *
      * @param[in] aOther  The other prefix to compare against.
      *
@@ -283,6 +307,19 @@ public:
     static uint8_t MatchLength(const uint8_t *aPrefixA, const uint8_t *aPrefixB, uint8_t aMaxSize);
 
     /**
+     * This method indicates whether or not a given prefix length is valid for use as a NAT64 prefix.
+     *
+     * A NAT64 prefix must have one of the following lengths: 32, 40, 48, 56, 64, or 96 (per RFC 6502).
+     *
+     * @param[in] aLength The length of the prefix.
+     *
+     * @retval TRUE   If the prefix has a valid length for use as a NAT64 prefix.
+     * @retval FALSE  If the prefix does not have a valid length for use as a NAT64 prefix.
+     *
+     */
+    static bool IsValidNat64PrefixLength(uint8_t aLength);
+
+    /**
      * This method indicates whether or not the prefix has a valid length for use as a NAT64 prefix.
      *
      * A NAT64 prefix must have one of the following lengths: 32, 40, 48, 56, 64, or 96 (per RFC 6502).
@@ -291,7 +328,7 @@ public:
      * @retval FALSE  If the prefix does not have a valid length for use as a NAT64 prefix.
      *
      */
-    bool IsValidNat64(void) const;
+    bool IsValidNat64(void) const { return IsValidNat64PrefixLength(mLength); }
 
     /**
      * This method converts the prefix to a string.
@@ -311,7 +348,7 @@ public:
      * If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be
      * truncated but the outputted string is always null-terminated.
      *
-     * @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be nullptr).
+     * @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be `nullptr`).
      * @param[in]  aSize     The size of @p aBuffer (in bytes).
      *
      */
@@ -952,7 +989,7 @@ public:
      * If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be
      * truncated but the outputted string is always null-terminated.
      *
-     * @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be nullptr).
+     * @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be `nullptr`).
      * @param[in]  aSize     The size of @p aBuffer (in bytes).
      *
      */
@@ -991,6 +1028,12 @@ private:
  */
 
 } // namespace Ip6
+
+DefineCoreType(otIp6NetworkPrefix, Ip6::NetworkPrefix);
+DefineCoreType(otIp6Prefix, Ip6::Prefix);
+DefineCoreType(otIp6InterfaceIdentifier, Ip6::InterfaceIdentifier);
+DefineCoreType(otIp6Address, Ip6::Address);
+
 } // namespace ot
 
 #endif // IP6_ADDRESS_HPP_

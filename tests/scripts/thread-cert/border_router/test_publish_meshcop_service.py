@@ -59,6 +59,7 @@ class PublishMeshCopService(thread_cert.TestCase):
             'is_otbr': True,
             'version': '1.2',
             'network_name': 'ot-br1',
+            'boot_delay': 5,
         },
         BR2: {
             'name': 'BR_2',
@@ -66,6 +67,7 @@ class PublishMeshCopService(thread_cert.TestCase):
             'is_otbr': True,
             'version': '1.2',
             'network_name': 'ot-br2',
+            'boot_delay': 5,
         },
         HOST: {
             'name': 'Host',
@@ -79,13 +81,18 @@ class PublishMeshCopService(thread_cert.TestCase):
         br2 = self.nodes[BR2]
         br2.disable_br()
 
-        host.bash('service otbr-agent stop')
+        # Use different network names to distinguish meshcop services
+        br1.set_network_name('ot-br1')
+        br2.set_network_name('ot-br2')
+
         host.start(start_radvd=False)
         self.simulator.go(20)
 
         self.assertEqual(br1.get_state(), 'disabled')
+        # TODO enable this line when renaming with mDNSResponder is stable
+        # self.check_meshcop_service(br1, host)
         br1.start()
-        self.simulator.go(20)
+        self.simulator.go(config.BORDER_ROUTER_STARTUP_DELAY)
         self.assertEqual('leader', br1.get_state())
         self.check_meshcop_service(br1, host)
 
@@ -96,19 +103,38 @@ class PublishMeshCopService(thread_cert.TestCase):
         br1.stop()
         br1.set_network_name('ot-br1-1')
         br1.start()
-        self.simulator.go(10)
+        self.simulator.go(config.BORDER_ROUTER_STARTUP_DELAY)
         self.check_meshcop_service(br1, host)
 
         # verify that there are two meshcop services
+        br2.set_network_name('ot-br2-1')
         br2.start()
         br2.disable_backbone_router()
         br2.enable_br()
-        self.simulator.go(25)
+        self.simulator.go(config.BORDER_ROUTER_STARTUP_DELAY)
+
         service_instances = host.browse_mdns_services('_meshcop._udp')
         self.assertEqual(len(service_instances), 2)
         br1_service = self.check_meshcop_service(br1, host)
         br2_service = self.check_meshcop_service(br2, host)
         self.assertNotEqual(br1_service['host'], br2_service['host'])
+
+        br1.stop_otbr_service()
+        self.simulator.go(5)
+        br2.enable_backbone_router()
+        self.simulator.go(5)
+        self.assertEqual(len(host.browse_mdns_services('_meshcop._udp')), 1)
+        br1.start_otbr_service()
+        self.simulator.go(10)
+        self.assertEqual(len(host.browse_mdns_services('_meshcop._udp')), 2)
+        self.check_meshcop_service(br1, host)
+        self.check_meshcop_service(br2, host)
+
+        br1.factory_reset()
+        br1.set_network_name('ot-br-1-3')
+        self.assertEqual(len(host.browse_mdns_services('_meshcop._udp')), 2)
+        self.check_meshcop_service(br1, host)
+        self.check_meshcop_service(br2, host)
 
     def check_meshcop_service(self, br, host):
         services = self.discover_all_meshcop_services(host)
@@ -135,7 +161,7 @@ class PublishMeshCopService(thread_cert.TestCase):
         self.assertEqual((state_bitmap >> 8 & 1), br.get_backbone_router_state() == 'Primary')  # BBR is primary or not
         self.assertEqual(service_data['txt']['nn'], br.get_network_name())
         self.assertEqual(service_data['txt']['rv'], '1')
-        self.assertIn(service_data['txt']['tv'], ['1.1.0', '1.1.1', '1.2.0'])
+        self.assertIn(service_data['txt']['tv'], ['1.1.0', '1.1.1', '1.2.0', '1.3.0'])
 
     def discover_all_meshcop_services(self, host):
         instance_names = host.browse_mdns_services('_meshcop._udp')
