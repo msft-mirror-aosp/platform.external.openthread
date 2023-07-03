@@ -120,7 +120,7 @@ public:
      *
      * @param aAddresses   A pointer to IPv6 multicast addresses to register.
      * @param aAddressNum  The number of IPv6 multicast addresses.
-     * @param aTimeout     A pointer to the timeout (in seconds), or nullptr to use the default MLR timeout.
+     * @param aTimeout     A pointer to the timeout (in seconds), or `nullptr` to use the default MLR timeout.
      *                     A timeout of 0 seconds removes the Multicast Listener addresses.
      * @param aCallback    A callback function.
      * @param aContext     A user context pointer.
@@ -192,7 +192,7 @@ private:
                                              const Ip6::Address *aFailedAddresses,
                                              uint8_t             aFailedAddressNum);
 
-    void        AppendToUniqueAddressList(Ip6::Address (&aAddresses)[kIp6AddressesNumMax],
+    void        AppendToUniqueAddressList(Ip6::Address (&aAddresses)[Ip6AddressesTlv::kMaxAddresses],
                                           uint8_t &           aAddressNum,
                                           const Ip6::Address &aAddress);
     static bool AddressListContains(const Ip6::Address *aAddressList,
