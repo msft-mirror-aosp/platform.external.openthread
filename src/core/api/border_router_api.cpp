@@ -38,37 +38,15 @@
 #include <openthread/border_router.h>
 
 #include "border_router/routing_manager.hpp"
-#include "common/as_core_type.hpp"
 #include "common/debug.hpp"
+#include "common/instance.hpp"
 
 using namespace ot;
 
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
-otError otBorderRoutingInit(otInstance *aInstance, uint32_t aInfraIfIndex, bool aInfraIfIsRunning)
-{
-    return AsCoreType(aInstance).Get<BorderRouter::RoutingManager>().Init(aInfraIfIndex, aInfraIfIsRunning);
-}
-
-otError otBorderRoutingSetEnabled(otInstance *aInstance, bool aEnabled)
-{
-    return AsCoreType(aInstance).Get<BorderRouter::RoutingManager>().SetEnabled(aEnabled);
-}
-
-otError otBorderRoutingGetOmrPrefix(otInstance *aInstance, otIp6Prefix *aPrefix)
-{
-    return AsCoreType(aInstance).Get<BorderRouter::RoutingManager>().GetOmrPrefix(AsCoreType(aPrefix));
-}
-
-otError otBorderRoutingGetOnLinkPrefix(otInstance *aInstance, otIp6Prefix *aPrefix)
-{
-    return AsCoreType(aInstance).Get<BorderRouter::RoutingManager>().GetOnLinkPrefix(AsCoreType(aPrefix));
-}
-
-#endif
-
 otError otBorderRouterGetNetData(otInstance *aInstance, bool aStable, uint8_t *aData, uint8_t *aDataLength)
 {
-    return AsCoreType(aInstance).Get<NetworkData::Local>().CopyNetworkData(aStable, aData, *aDataLength);
+    return AsCoreType(aInstance).Get<NetworkData::Local>().CopyNetworkData(
+        aStable ? NetworkData::kStableSubset : NetworkData::kFullSet, aData, *aDataLength);
 }
 
 otError otBorderRouterAddOnMeshPrefix(otInstance *aInstance, const otBorderRouterConfig *aConfig)

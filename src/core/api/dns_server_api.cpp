@@ -33,7 +33,7 @@
 
 #include "openthread-core-config.h"
 
-#include "common/as_core_type.hpp"
+#include "common/instance.hpp"
 #include "net/dns_types.hpp"
 #include "net/dnssd_server.hpp"
 
@@ -79,6 +79,11 @@ otDnssdQueryType otDnssdGetQueryTypeAndName(const otDnssdQuery *aQuery, char (*a
     OT_ASSERT(aNameOutput != nullptr);
 
     return MapEnum(Dns::ServiceDiscovery::Server::GetQueryTypeAndName(aQuery, *aNameOutput));
+}
+
+const otDnssdCounters *otDnssdGetCounters(otInstance *aInstance)
+{
+    return &AsCoreType(aInstance).Get<Dns::ServiceDiscovery::Server>().GetCounters();
 }
 
 #endif // OPENTHREAD_CONFIG_DNSSD_SERVER_ENABLE
