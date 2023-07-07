@@ -43,22 +43,9 @@
 namespace ot {
 namespace Cli {
 
-constexpr NetworkData::Command NetworkData::sCommands[];
-
-void NetworkData::OutputPrefix(const otBorderRouterConfig &aConfig)
+void NetworkData::PrefixFlagsToString(const otBorderRouterConfig &aConfig, FlagsString &aString)
 {
-    enum
-    {
-        // BorderRouter flag is `uint16_t` (though some of the bits are
-        // reserved for future use), so we use 17 chars string (16 flags
-        // plus null char at end of string).
-        kMaxFlagStringSize = 17,
-    };
-
-    char  flagsString[kMaxFlagStringSize];
-    char *flagsPtr = &flagsString[0];
-
-    OutputIp6Prefix(aConfig.mPrefix);
+    char *flagsPtr = &aString[0];
 
     if (aConfig.mPreferred)
     {
@@ -106,31 +93,27 @@ void NetworkData::OutputPrefix(const otBorderRouterConfig &aConfig)
     }
 
     *flagsPtr = '\0';
+}
 
-    if (flagsPtr != &flagsString[0])
+void NetworkData::OutputPrefix(const otBorderRouterConfig &aConfig)
+{
+    FlagsString flagsString;
+
+    OutputIp6Prefix(aConfig.mPrefix);
+
+    PrefixFlagsToString(aConfig, flagsString);
+
+    if (flagsString[0] != '\0')
     {
         OutputFormat(" %s", flagsString);
     }
 
-    OutputPreference(aConfig.mPreference);
-
-    OutputLine(" %04x", aConfig.mRloc16);
+    OutputLine(" %s %04x", Interpreter::PreferenceToString(aConfig.mPreference), aConfig.mRloc16);
 }
 
-void NetworkData::OutputRoute(const otExternalRouteConfig &aConfig)
+void NetworkData::RouteFlagsToString(const otExternalRouteConfig &aConfig, FlagsString &aString)
 {
-    enum
-    {
-        // ExternalRoute flag is `uint8_t` (though some of the bits are
-        // reserved for future use), so we use 9 chars string (8 flags
-        // plus null char at end of string).
-        kMaxFlagStringSize = 9,
-    };
-
-    char  flagsString[kMaxFlagStringSize];
-    char *flagsPtr = &flagsString[0];
-
-    OutputIp6Prefix(aConfig.mPrefix);
+    char *flagsPtr = &aString[0];
 
     if (aConfig.mStable)
     {
@@ -143,36 +126,22 @@ void NetworkData::OutputRoute(const otExternalRouteConfig &aConfig)
     }
 
     *flagsPtr = '\0';
+}
 
-    if (flagsPtr != &flagsString[0])
+void NetworkData::OutputRoute(const otExternalRouteConfig &aConfig)
+{
+    FlagsString flagsString;
+
+    OutputIp6Prefix(aConfig.mPrefix);
+
+    RouteFlagsToString(aConfig, flagsString);
+
+    if (flagsString[0] != '\0')
     {
         OutputFormat(" %s", flagsString);
     }
 
-    OutputPreference(aConfig.mPreference);
-
-    OutputLine(" %04x", aConfig.mRloc16);
-}
-
-void NetworkData::OutputPreference(signed int aPreference)
-{
-    switch (aPreference)
-    {
-    case OT_ROUTE_PREFERENCE_LOW:
-        OutputFormat(" low");
-        break;
-
-    case OT_ROUTE_PREFERENCE_MED:
-        OutputFormat(" med");
-        break;
-
-    case OT_ROUTE_PREFERENCE_HIGH:
-        OutputFormat(" high");
-        break;
-
-    default:
-        break;
-    }
+    OutputLine(" %s %04x", Interpreter::PreferenceToString(aConfig.mPreference), aConfig.mRloc16);
 }
 
 void NetworkData::OutputService(const otServiceConfig &aConfig)
@@ -190,26 +159,32 @@ void NetworkData::OutputService(const otServiceConfig &aConfig)
     OutputLine(" %04x", aConfig.mServerConfig.mRloc16);
 }
 
-otError NetworkData::ProcessHelp(Arg aArgs[])
-{
-    OT_UNUSED_VARIABLE(aArgs);
-
-    for (const Command &command : sCommands)
-    {
-        OutputLine(command.mName);
-    }
-
-    return OT_ERROR_NONE;
-}
-
 #if OPENTHREAD_CONFIG_NETDATA_PUBLISHER_ENABLE
-otError NetworkData::ProcessPublish(Arg aArgs[])
+template <> otError NetworkData::Process<Cmd("publish")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
 
 #if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     if (aArgs[0] == "dnssrp")
     {
+        /**
+         * @cli netdata publish dnssrp anycast
+         * @code
+         * netdata publish dnssrp anycast 1
+         * Done
+         * @endcode
+         * @cparam netdata publish dnssrp anycast @ca{seq-num}
+         * @par
+         * Publishes a DNS/SRP Service Anycast Address with a sequence number. Any current
+         * DNS/SRP Service entry being published from a previous `publish dnssrp{anycast|unicast}`
+         * command is removed and replaced with the new arguments.
+         * @par
+         * `OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE` must be enabled.
+         * @csa{netdata publish dnssrp unicast (addr,port)}
+         * @csa{netdata publish dnssrp unicast (mle)}
+         * @sa otNetDataPublishDnsSrpServiceAnycast
+         * @endcli
+         */
         if (aArgs[1] == "anycast")
         {
             uint8_t sequenceNumber;
@@ -224,6 +199,26 @@ otError NetworkData::ProcessPublish(Arg aArgs[])
             otIp6Address address;
             uint16_t     port;
 
+            /**
+             * @cli netdata publish dnssrp unicast (mle)
+             * @code
+             * netdata publish dnssrp unicast 50152
+             * Done
+             * @endcode
+             * @cparam netdata publish dnssrp unicast @ca{port}
+             * @par
+             * Publishes the device's Mesh-Local EID with a port number. MLE and port information is
+             * included in the Server TLV data. To use a different Unicast address, use the
+             * `netdata publish dnssrp unicast (addr,port)` command.
+             * @par
+             * Any current DNS/SRP Service entry being published from a previous
+             * `publish dnssrp{anycast|unicast}` command is removed and replaced with the new arguments.
+             * @par
+             * `OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE` must be enabled.
+             * @csa{netdata publish dnssrp unicast (addr,port)}
+             * @csa{netdata publish dnssrp anycast}
+             * @sa otNetDataPublishDnsSrpServiceUnicastMeshLocalEid
+             */
             if (aArgs[3].IsEmpty())
             {
                 SuccessOrExit(error = aArgs[2].ParseAsUint16(port));
@@ -231,6 +226,24 @@ otError NetworkData::ProcessPublish(Arg aArgs[])
                 ExitNow();
             }
 
+            /**
+             * @cli netdata publish dnssrp unicast (addr,port)
+             * @code
+             * netdata publish dnssrp unicast fd00::1234 51525
+             * Done
+             * @endcode
+             * @cparam netdata publish dnssrp unicast @ca{address} @ca{port}
+             * @par
+             * Publishes a DNS/SRP Service Unicast Address with an address and port number. The address
+             * and port information is included in Service TLV data. Any current DNS/SRP Service entry being
+             * published from a previous `publish dnssrp{anycast|unicast}` command is removed and replaced
+             * with the new arguments.
+             * @par
+             * `OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE` must be enabled.
+             * @csa{netdata publish dnssrp unicast (mle)}
+             * @csa{netdata publish dnssrp anycast}
+             * @sa otNetDataPublishDnsSrpServiceUnicast
+             */
             SuccessOrExit(error = aArgs[2].ParseAsIp6Address(address));
             SuccessOrExit(error = aArgs[3].ParseAsUint16(port));
             otNetDataPublishDnsSrpServiceUnicast(GetInstancePtr(), &address, port);
@@ -240,6 +253,18 @@ otError NetworkData::ProcessPublish(Arg aArgs[])
 #endif // OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
+    /**
+     * @cli netdata publish prefix
+     * @code
+     * netdata publish prefix fd00:1234:5678::/64 paos med
+     * Done
+     * @endcode
+     * @cparam netdata publish prefix @ca{prefix} [@ca{padcrosnD}] [@ca{high}|@ca{med}|@ca{low}]
+     * OT CLI uses mapped arguments to configure #otBorderRouterConfig values. @moreinfo{the @overview}.
+     * @par
+     * Publish an on-mesh prefix entry. @moreinfo{@netdata}.
+     * @sa otNetDataPublishOnMeshPrefix
+     */
     if (aArgs[0] == "prefix")
     {
         otBorderRouterConfig config;
@@ -249,6 +274,18 @@ otError NetworkData::ProcessPublish(Arg aArgs[])
         ExitNow();
     }
 
+    /**
+     * @cli netdata publish route
+     * @code
+     * netdata publish route fd00:1234:5678::/64 s high
+     * Done
+     * @endcode
+     * @cparam publish route @ca{prefix} [@ca{sn}] [@ca{high}|@ca{med}|@ca{low}]
+     * OT CLI uses mapped arguments to configure #otExternalRouteConfig values. @moreinfo{the @overview}.
+     * @par
+     * Publish an external route entry. @moreinfo{@netdata}.
+     * @sa otNetDataPublishExternalRoute
+     */
     if (aArgs[0] == "route")
     {
         otExternalRouteConfig config;
@@ -265,10 +302,19 @@ exit:
     return error;
 }
 
-otError NetworkData::ProcessUnpublish(Arg aArgs[])
+template <> otError NetworkData::Process<Cmd("unpublish")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
 
+/**
+ * @cli netdata unpublish dnssrp
+ * @code
+ * netdata unpublish dnssrp
+ * Done
+ * @endcode
+ * @par api_copy
+ * #otNetDataUnpublishDnsSrpService
+ */
 #if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
     if (aArgs[0] == "dnssrp")
     {
@@ -277,6 +323,18 @@ otError NetworkData::ProcessUnpublish(Arg aArgs[])
     }
 #endif
 
+/**
+ * @cli netdata unpublish (prefix)
+ * @code
+ * netdata unpublish fd00:1234:5678::/64
+ * Done
+ * @endcode
+ * @cparam netdata unpublish @ca{prefix}
+ * @par api_copy
+ * #otNetDataUnpublishPrefix
+ * @par
+ * @moreinfo{@netdata}.
+ */
 #if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
     {
         otIp6Prefix prefix;
@@ -297,7 +355,23 @@ exit:
 #endif // OPENTHREAD_CONFIG_NETDATA_PUBLISHER_ENABLE
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE || OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
-otError NetworkData::ProcessRegister(Arg aArgs[])
+/**
+ * @cli netdata register
+ * @code
+ * netdata register
+ * Done
+ * @endcode
+ * @par
+ * Register configured prefixes, routes, and services with the Leader.
+ * @par
+ * OT CLI checks for `OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE`. If OTBR is enabled, it
+ * registers local Network Data with the Leader. Otherwise, it calls the CLI function `otServerRegister`.
+ * @moreinfo{@netdata}.
+ * @csa{prefix add}
+ * @sa otBorderRouterRegister
+ * @sa otServerAddService
+ */
+template <> otError NetworkData::Process<Cmd("register")>(Arg aArgs[])
 {
     OT_UNUSED_VARIABLE(aArgs);
 
@@ -314,7 +388,7 @@ exit:
 }
 #endif
 
-otError NetworkData::ProcessSteeringData(Arg aArgs[])
+template <> otError NetworkData::Process<Cmd("steeringdata")>(Arg aArgs[])
 {
     otError           error;
     otExtAddress      addr;
@@ -332,10 +406,38 @@ otError NetworkData::ProcessSteeringData(Arg aArgs[])
 
     SuccessOrExit(error);
 
+    /**
+     * @cli netdata steeringdata check (discerner)
+     * @code
+     * netdata steeringdata check 0xabc/12
+     * Done
+     * @endcode
+     * @code
+     * netdata steeringdata check 0xdef/12
+     * Error 23: NotFound
+     * @endcode
+     * @cparam netdata steeringdata check @ca{discerner}
+     * *   `discerner`: The %Joiner discerner in format `{number}/{length}`.
+     * @par api_copy
+     * #otNetDataSteeringDataCheckJoinerWithDiscerner
+     * @csa{joiner discerner}
+     */
     if (discerner.mLength)
     {
         error = otNetDataSteeringDataCheckJoinerWithDiscerner(GetInstancePtr(), &discerner);
     }
+    /**
+     * @cli netdata steeringdata check (eui64)
+     * @code
+     * netdata steeringdata check d45e64fa83f81cf7
+     * Done
+     * @endcode
+     * @cparam netdata steeringdata check @ca{eui64}
+     * *   `eui64`: The IEEE EUI-64 of the %Joiner.
+     * @par api_copy
+     * #otNetDataSteeringDataCheckJoiner
+     * @csa{eui64}
+     */
     else
     {
         error = otNetDataSteeringDataCheckJoiner(GetInstancePtr(), &addr);
@@ -345,52 +447,124 @@ exit:
     return error;
 }
 
-void NetworkData::OutputPrefixes(void)
+otError NetworkData::GetNextPrefix(otNetworkDataIterator *aIterator, otBorderRouterConfig *aConfig, bool aLocal)
+{
+    otError error;
+
+    if (aLocal)
+    {
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
+        error = otBorderRouterGetNextOnMeshPrefix(GetInstancePtr(), aIterator, aConfig);
+#else
+        error = OT_ERROR_NOT_FOUND;
+#endif
+    }
+    else
+    {
+        error = otNetDataGetNextOnMeshPrefix(GetInstancePtr(), aIterator, aConfig);
+    }
+
+    return error;
+}
+
+void NetworkData::OutputPrefixes(bool aLocal)
 {
     otNetworkDataIterator iterator = OT_NETWORK_DATA_ITERATOR_INIT;
     otBorderRouterConfig  config;
 
     OutputLine("Prefixes:");
 
-    while (otNetDataGetNextOnMeshPrefix(GetInstancePtr(), &iterator, &config) == OT_ERROR_NONE)
+    while (GetNextPrefix(&iterator, &config, aLocal) == OT_ERROR_NONE)
     {
         OutputPrefix(config);
     }
 }
 
-void NetworkData::OutputRoutes(void)
+otError NetworkData::GetNextRoute(otNetworkDataIterator *aIterator, otExternalRouteConfig *aConfig, bool aLocal)
+{
+    otError error;
+
+    if (aLocal)
+    {
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
+        error = otBorderRouterGetNextRoute(GetInstancePtr(), aIterator, aConfig);
+#else
+        error = OT_ERROR_NOT_FOUND;
+#endif
+    }
+    else
+    {
+        error = otNetDataGetNextRoute(GetInstancePtr(), aIterator, aConfig);
+    }
+
+    return error;
+}
+
+void NetworkData::OutputRoutes(bool aLocal)
 {
     otNetworkDataIterator iterator = OT_NETWORK_DATA_ITERATOR_INIT;
     otExternalRouteConfig config;
 
     OutputLine("Routes:");
 
-    while (otNetDataGetNextRoute(GetInstancePtr(), &iterator, &config) == OT_ERROR_NONE)
+    while (GetNextRoute(&iterator, &config, aLocal) == OT_ERROR_NONE)
     {
         OutputRoute(config);
     }
 }
 
-void NetworkData::OutputServices(void)
+otError NetworkData::GetNextService(otNetworkDataIterator *aIterator, otServiceConfig *aConfig, bool aLocal)
+{
+    otError error;
+
+    if (aLocal)
+    {
+#if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
+        error = otServerGetNextService(GetInstancePtr(), aIterator, aConfig);
+#else
+        error = OT_ERROR_NOT_FOUND;
+#endif
+    }
+    else
+    {
+        error = otNetDataGetNextService(GetInstancePtr(), aIterator, aConfig);
+    }
+
+    return error;
+}
+
+void NetworkData::OutputServices(bool aLocal)
 {
     otNetworkDataIterator iterator = OT_NETWORK_DATA_ITERATOR_INIT;
     otServiceConfig       config;
 
     OutputLine("Services:");
 
-    while (otNetDataGetNextService(GetInstancePtr(), &iterator, &config) == OT_ERROR_NONE)
+    while (GetNextService(&iterator, &config, aLocal) == OT_ERROR_NONE)
     {
         OutputService(config);
     }
 }
 
-otError NetworkData::OutputBinary(void)
+otError NetworkData::OutputBinary(bool aLocal)
 {
-    otError error = OT_ERROR_NONE;
+    otError error;
     uint8_t data[255];
     uint8_t len = sizeof(data);
 
-    SuccessOrExit(error = otNetDataGet(GetInstancePtr(), false, data, &len));
+    if (aLocal)
+    {
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
+        error = otBorderRouterGetNetData(GetInstancePtr(), false, data, &len);
+#else
+        error = OT_ERROR_NOT_IMPLEMENTED;
+#endif
+    }
+    else
+    {
+        error = otNetDataGet(GetInstancePtr(), false, data, &len);
+    }
+    SuccessOrExit(error);
 
     OutputBytesLine(data, static_cast<uint8_t>(len));
 
@@ -398,37 +572,146 @@ exit:
     return error;
 }
 
-otError NetworkData::ProcessShow(Arg aArgs[])
+/**
+ * @cli netdata show
+ * @code
+ * netdata show
+ * Prefixes:
+ * fd00:dead:beef:cafe::/64 paros med dc00
+ * Routes:
+ * fd49:7770:7fc5:0::/64 s med 4000
+ * Services:
+ * 44970 5d c000 s 4000
+ * 44970 01 9a04b000000e10 s 4000
+ * Done
+ * @endcode
+ * @code
+ * netdata show -x
+ * 08040b02174703140040fd00deadbeefcafe0504dc00330007021140
+ * Done
+ * @endcode
+ * @cparam netdata show [@ca{-x}]
+ * *   The optional `-x` argument gets Network Data as hex-encoded TLVs.
+ * @par
+ * `netdata show` from OT CLI gets full Network Data received from the Leader. This command uses several
+ * API functions to combine prefixes, routes, and services, including #otNetDataGetNextOnMeshPrefix,
+ * #otNetDataGetNextRoute, and #otNetDataGetNextService.
+ * @par
+ * @moreinfo{@netdata}.
+ * @csa{br omrprefix}
+ * @csa{br onlinkprefix}
+ * @sa otBorderRouterGetNetData
+ */
+template <> otError NetworkData::Process<Cmd("show")>(Arg aArgs[])
 {
-    otError error = OT_ERROR_INVALID_ARGS;
+    otError error  = OT_ERROR_INVALID_ARGS;
+    bool    local  = false;
+    bool    binary = false;
 
-    if (aArgs[0].IsEmpty())
+    for (uint8_t i = 0; !aArgs[i].IsEmpty(); i++)
     {
-        OutputPrefixes();
-        OutputRoutes();
-        OutputServices();
+        /**
+         * @cli netdata show local
+         * @code
+         * netdata show local
+         * Prefixes:
+         * fd00:dead:beef:cafe::/64 paros med dc00
+         * Routes:
+         * Services:
+         * Done
+         * @endcode
+         * @code
+         * netdata show local -x
+         * 08040b02174703140040fd00deadbeefcafe0504dc00330007021140
+         * Done
+         * @endcode
+         * @cparam netdata show local [@ca{-x}]
+         * *   The optional `-x` argument gets local Network Data as hex-encoded TLVs.
+         * @par
+         * Print local Network Data to sync with the Leader.
+         * @csa{netdata show}
+         */
+        if (aArgs[i] == "local")
+        {
+            local = true;
+        }
+        else if (aArgs[i] == "-x")
+        {
+            binary = true;
+        }
+        else
+        {
+            ExitNow(error = OT_ERROR_INVALID_ARGS);
+        }
+    }
+
+    if (binary)
+    {
+        error = OutputBinary(local);
+    }
+    else
+    {
+        OutputPrefixes(local);
+        OutputRoutes(local);
+        OutputServices(local);
         error = OT_ERROR_NONE;
     }
-    else if (aArgs[0] == "-x")
-    {
-        error = OutputBinary();
-    }
 
+exit:
     return error;
 }
 
 otError NetworkData::Process(Arg aArgs[])
 {
+#define CmdEntry(aCommandString)                                   \
+    {                                                              \
+        aCommandString, &NetworkData::Process<Cmd(aCommandString)> \
+    }
+
+    static constexpr Command kCommands[] = {
+#if OPENTHREAD_CONFIG_NETDATA_PUBLISHER_ENABLE
+        CmdEntry("publish"),
+#endif
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE || OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
+        CmdEntry("register"),
+#endif
+        CmdEntry("show"),
+        CmdEntry("steeringdata"),
+#if OPENTHREAD_CONFIG_NETDATA_PUBLISHER_ENABLE
+        CmdEntry("unpublish"),
+#endif
+    };
+
+#undef CmdEntry
+
+    static_assert(BinarySearch::IsSorted(kCommands), "kCommands is not sorted");
+
     otError        error = OT_ERROR_INVALID_COMMAND;
     const Command *command;
 
-    if (aArgs[0].IsEmpty())
+    /**
+     * @cli netdata help
+     * @code
+     * netdata help
+     * help
+     * publish
+     * register
+     * show
+     * steeringdata
+     * unpublish
+     * Done
+     * @endcode
+     * @par
+     * Gets a list of `netdata` CLI commands.
+     * @sa @netdata
+     */
+    if (aArgs[0].IsEmpty() || (aArgs[0] == "help"))
     {
-        IgnoreError(ProcessHelp(aArgs));
-        ExitNow();
+        OutputCommandTable(kCommands);
+        ExitNow(error = aArgs[0].IsEmpty() ? error : OT_ERROR_NONE);
     }
 
-    command = Utils::LookupTable::Find(aArgs[0].GetCString(), sCommands);
+    command = BinarySearch::Find(aArgs[0].GetCString(), kCommands);
     VerifyOrExit(command != nullptr);
 
     error = (this->*command->mHandler)(aArgs + 1);
