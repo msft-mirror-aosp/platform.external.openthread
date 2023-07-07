@@ -35,6 +35,7 @@ set(COMMON_SOURCES
     api/backbone_router_ftd_api.cpp
     api/border_agent_api.cpp
     api/border_router_api.cpp
+    api/border_routing_api.cpp
     api/channel_manager_api.cpp
     api/channel_monitor_api.cpp
     api/child_supervision_api.cpp
@@ -48,7 +49,6 @@ set(COMMON_SOURCES
     api/diags_api.cpp
     api/dns_api.cpp
     api/dns_server_api.cpp
-    api/entropy_api.cpp
     api/error_api.cpp
     api/heap_api.cpp
     api/history_tracker_api.cpp
@@ -79,6 +79,7 @@ set(COMMON_SOURCES
     api/tcp_api.cpp
     api/thread_api.cpp
     api/thread_ftd_api.cpp
+    api/trel_api.cpp
     api/udp_api.cpp
     backbone_router/backbone_tmf.cpp
     backbone_router/bbr_leader.cpp
@@ -86,20 +87,26 @@ set(COMMON_SOURCES
     backbone_router/bbr_manager.cpp
     backbone_router/multicast_listeners_table.cpp
     backbone_router/ndproxy_table.cpp
-    border_router/infra_if_platform.cpp
-    border_router/router_advertisement.cpp
+    border_router/infra_if.cpp
     border_router/routing_manager.cpp
     coap/coap.cpp
     coap/coap_message.cpp
     coap/coap_secure.cpp
+    common/appender.cpp
+    common/binary_search.cpp
     common/crc16.cpp
+    common/data.cpp
     common/error.cpp
+    common/frame_builder.cpp
+    common/frame_data.cpp
+    common/heap.cpp
+    common/heap_data.cpp
     common/heap_string.cpp
     common/instance.cpp
-    common/logging.cpp
+    common/log.cpp
     common/message.cpp
     common/notifier.cpp
-    common/random_manager.cpp
+    common/random.cpp
     common/settings.cpp
     common/string.cpp
     common/tasklet.cpp
@@ -112,6 +119,7 @@ set(COMMON_SOURCES
     crypto/aes_ecb.cpp
     crypto/crypto_platform.cpp
     crypto/ecdsa.cpp
+    crypto/ecdsa_tinycrypt.cpp
     crypto/hkdf_sha256.cpp
     crypto/hmac_sha256.cpp
     crypto/mbedtls.cpp
@@ -140,26 +148,30 @@ set(COMMON_SOURCES
     meshcop/dataset_updater.cpp
     meshcop/dtls.cpp
     meshcop/energy_scan_client.cpp
+    meshcop/extended_panid.cpp
     meshcop/joiner.cpp
     meshcop/joiner_router.cpp
     meshcop/meshcop.cpp
     meshcop/meshcop_leader.cpp
     meshcop/meshcop_tlvs.cpp
+    meshcop/network_name.cpp
     meshcop/panid_query_client.cpp
     meshcop/timestamp.cpp
     net/checksum.cpp
     net/dhcp6_client.cpp
     net/dhcp6_server.cpp
     net/dns_client.cpp
+    net/dns_dso.cpp
     net/dns_types.cpp
     net/dnssd_server.cpp
     net/icmp6.cpp
-    net/ip4_address.cpp
+    net/ip4_types.cpp
     net/ip6.cpp
     net/ip6_address.cpp
     net/ip6_filter.cpp
     net/ip6_headers.cpp
     net/ip6_mpl.cpp
+    net/nd6.cpp
     net/nd_agent.cpp
     net/netif.cpp
     net/sntp_client.cpp
@@ -222,7 +234,6 @@ set(COMMON_SOURCES
     utils/heap.cpp
     utils/history_tracker.cpp
     utils/jam_detector.cpp
-    utils/lookup_table.cpp
     utils/otns.cpp
     utils/parse_cmdline.cpp
     utils/ping_sender.cpp
@@ -238,10 +249,11 @@ set(RADIO_COMMON_SOURCES
     api/logging_api.cpp
     api/random_noncrypto_api.cpp
     api/tasklet_api.cpp
+    common/binary_search.cpp
     common/error.cpp
     common/instance.cpp
-    common/logging.cpp
-    common/random_manager.cpp
+    common/log.cpp
+    common/random.cpp
     common/string.cpp
     common/tasklet.cpp
     common/timer.cpp
@@ -260,7 +272,6 @@ set(RADIO_COMMON_SOURCES
     radio/radio_callbacks.cpp
     radio/radio_platform.cpp
     thread/link_quality.cpp
-    utils/lookup_table.cpp
     utils/parse_cmdline.cpp
 )
 
