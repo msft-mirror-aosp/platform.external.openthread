@@ -36,8 +36,6 @@
 
 #include "openthread-core-config.h"
 
-#if OPENTHREAD_FTD
-
 #include "coap/coap.hpp"
 #include "common/linked_list.hpp"
 #include "common/locator.hpp"
@@ -87,6 +85,7 @@ public:
      */
     explicit AddressResolver(Instance &aInstance);
 
+#if OPENTHREAD_FTD
     /**
      * This method clears the EID-to-RLOC cache.
      *
@@ -96,8 +95,8 @@ public:
     /**
      * This method gets the information about the next EID cache entry (using an iterator).
      *
-     * @param[out]   aInfo       An `EntryInfo` where the EID cache entry information is placed.
-     * @param[inout] aIterator   An iterator. It will be updated to point to the next entry on success.
+     * @param[out]    aInfo      An `EntryInfo` where the EID cache entry information is placed.
+     * @param[in,out] aIterator  An iterator. It will be updated to point to the next entry on success.
      *                           To get the first entry, initialize the iterator by setting all its fields to zero.
      *                           e.g., `memset` the the iterator structure to zero.
      *
@@ -145,21 +144,31 @@ public:
     void UpdateSnoopedCacheEntry(const Ip6::Address &aEid, Mac::ShortAddress aRloc16, Mac::ShortAddress aDest);
 
     /**
-     * This method returns the RLOC16 for a given EID, initiates an Address Query if allowed and the mapping is not
-     * known.
+     * This method returns the RLOC16 for a given EID, initiates an Address Query if the mapping is not known.
      *
      * @param[in]   aEid                A reference to the EID.
      * @param[out]  aRloc16             The RLOC16 corresponding to @p aEid.
-     * @param[in]   aAllowAddressQuery  Allow to initiate Address Query if the mapping is not known.
      *
      * @retval kErrorNone           Successfully provided the RLOC16.
      * @retval kErrorAddressQuery   Initiated an Address Query if allowed.
      * @retval kErrorDrop           Earlier Address Query for the EID timed out. In retry timeout interval.
      * @retval kErrorNoBufs         Insufficient buffer space available to send Address Query.
-     * @retval kErrorNotFound       The mapping was not found and Address Query was not allowed.
      *
      */
-    Error Resolve(const Ip6::Address &aEid, Mac::ShortAddress &aRloc16, bool aAllowAddressQuery = true);
+    Error Resolve(const Ip6::Address &aEid, Mac::ShortAddress &aRloc16)
+    {
+        return Resolve(aEid, aRloc16, /* aAllowAddressQuery */ true);
+    }
+
+    /**
+     * This method looks up the RLOC16 for a given EID in the address cache.
+     *
+     * @param[in]   aEid                A reference to the EID.
+     *
+     * @returns The RLOC16 mapping to @p aEid or `Mac::kShortAddrInvalid` if it is not found in the address cache.
+     *
+     */
+    Mac::ShortAddress LookUp(const Ip6::Address &aEid);
 
     /**
      * This method restarts any ongoing address queries.
@@ -295,6 +304,7 @@ private:
 
     CacheEntryPool &GetCacheEntryPool(void) { return mCacheEntryPool; }
 
+    Error       Resolve(const Ip6::Address &aEid, Mac::ShortAddress &aRloc16, bool aAllowAddressQuery);
     void        Remove(Mac::ShortAddress aRloc16, bool aMatchRouterId);
     void        Remove(const Ip6::Address &aEid, Reason aReason);
     CacheEntry *FindCacheEntry(const Ip6::Address &aEid, CacheEntryList *&aList, CacheEntry *&aPrevEntry);
@@ -306,9 +316,12 @@ private:
 
     static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
+#endif // OPENTHREAD_FTD
+
     static void HandleAddressError(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
     void        HandleAddressError(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
+#if OPENTHREAD_FTD
     static void HandleAddressQuery(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
     void        HandleAddressQuery(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
@@ -334,7 +347,9 @@ private:
 
     static AddressResolver::CacheEntry *GetEntryAfter(CacheEntry *aPrev, CacheEntryList &aList);
 
+#endif // OPENTHREAD_FTD
     Coap::Resource mAddressError;
+#if OPENTHREAD_FTD
     Coap::Resource mAddressQuery;
     Coap::Resource mAddressNotification;
 
@@ -345,6 +360,7 @@ private:
     CacheEntryList mQueryRetryList;
 
     Ip6::Icmp::Handler mIcmpHandler;
+#endif //  OPENTHREAD_FTD
 };
 
 /**
@@ -352,7 +368,5 @@ private:
  */
 
 } // namespace ot
-
-#endif //  OPENTHREAD_FTD
 
 #endif // ADDRESS_RESOLVER_HPP_
