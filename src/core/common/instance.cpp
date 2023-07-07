@@ -35,7 +35,6 @@
 
 #include <openthread/platform/misc.h>
 
-#include "common/logging.hpp"
 #include "common/new.hpp"
 #include "radio/trel_link.hpp"
 #include "utils/heap.hpp"
@@ -59,7 +58,7 @@ bool Instance::sDnsNameCompressionEnabled = true;
 #endif
 
 #if OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE
-otLogLevel Instance::sLogLevel = static_cast<otLogLevel>(OPENTHREAD_CONFIG_LOG_LEVEL_INIT);
+LogLevel Instance::sLogLevel = static_cast<LogLevel>(OPENTHREAD_CONFIG_LOG_LEVEL_INIT);
 #endif
 
 Instance::Instance(void)
@@ -79,6 +78,121 @@ Instance::Instance(void)
     , mMessagePool(*this)
     , mIp6(*this)
     , mThreadNetif(*this)
+    , mTmfAgent(*this)
+#if OPENTHREAD_CONFIG_DHCP6_CLIENT_ENABLE
+    , mDhcp6Client(*this)
+#endif
+#if OPENTHREAD_CONFIG_DHCP6_SERVER_ENABLE
+    , mDhcp6Server(*this)
+#endif
+#if OPENTHREAD_CONFIG_NEIGHBOR_DISCOVERY_AGENT_ENABLE
+    , mNeighborDiscoveryAgent(*this)
+#endif
+#if OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE
+    , mSlaac(*this)
+#endif
+#if OPENTHREAD_CONFIG_DNS_CLIENT_ENABLE
+    , mDnsClient(*this)
+#endif
+#if OPENTHREAD_CONFIG_SRP_CLIENT_ENABLE
+    , mSrpClient(*this)
+#endif
+#if OPENTHREAD_CONFIG_SRP_CLIENT_BUFFERS_ENABLE
+    , mSrpClientBuffers(*this)
+#endif
+#if OPENTHREAD_CONFIG_DNSSD_SERVER_ENABLE
+    , mDnssdServer(*this)
+#endif
+#if OPENTHREAD_CONFIG_DNS_DSO_ENABLE
+    , mDnsDso(*this)
+#endif
+#if OPENTHREAD_CONFIG_SNTP_CLIENT_ENABLE
+    , mSntpClient(*this)
+#endif
+    , mActiveDataset(*this)
+    , mPendingDataset(*this)
+    , mExtendedPanIdManager(*this)
+    , mNetworkNameManager(*this)
+    , mIp6Filter(*this)
+    , mKeyManager(*this)
+    , mLowpan(*this)
+    , mMac(*this)
+    , mMeshForwarder(*this)
+    , mMleRouter(*this)
+    , mDiscoverScanner(*this)
+    , mAddressResolver(*this)
+#if OPENTHREAD_CONFIG_MULTI_RADIO
+    , mRadioSelector(*this)
+#endif
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE || OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
+    , mNetworkDataLocal(*this)
+#endif
+    , mNetworkDataLeader(*this)
+#if OPENTHREAD_FTD || OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE || OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
+    , mNetworkDataNotifier(*this)
+#endif
+#if OPENTHREAD_CONFIG_NETDATA_PUBLISHER_ENABLE
+    , mNetworkDataPublisher(*this)
+#endif
+    , mNetworkDataServiceManager(*this)
+#if OPENTHREAD_FTD || OPENTHREAD_CONFIG_TMF_NETWORK_DIAG_MTD_ENABLE
+    , mNetworkDiagnostic(*this)
+#endif
+#if OPENTHREAD_CONFIG_BORDER_AGENT_ENABLE
+    , mBorderAgent(*this)
+#endif
+#if OPENTHREAD_CONFIG_COMMISSIONER_ENABLE && OPENTHREAD_FTD
+    , mCommissioner(*this)
+#endif
+#if OPENTHREAD_CONFIG_DTLS_ENABLE
+    , mCoapSecure(*this)
+#endif
+#if OPENTHREAD_CONFIG_JOINER_ENABLE
+    , mJoiner(*this)
+#endif
+#if OPENTHREAD_CONFIG_JAM_DETECTION_ENABLE
+    , mJamDetector(*this)
+#endif
+#if OPENTHREAD_FTD
+    , mJoinerRouter(*this)
+    , mLeader(*this)
+#endif
+#if (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2)
+    , mBackboneRouterLeader(*this)
+#endif
+#if OPENTHREAD_FTD && OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
+    , mBackboneRouterLocal(*this)
+    , mBackboneRouterManager(*this)
+#endif
+#if OPENTHREAD_CONFIG_MLR_ENABLE || (OPENTHREAD_FTD && OPENTHREAD_CONFIG_TMF_PROXY_MLR_ENABLE)
+    , mMlrManager(*this)
+#endif
+
+#if OPENTHREAD_CONFIG_DUA_ENABLE || (OPENTHREAD_FTD && OPENTHREAD_CONFIG_TMF_PROXY_DUA_ENABLE)
+    , mDuaManager(*this)
+#endif
+#if OPENTHREAD_CONFIG_SRP_SERVER_ENABLE
+    , mSrpServer(*this)
+#endif
+
+#if OPENTHREAD_CONFIG_CHILD_SUPERVISION_ENABLE
+#if OPENTHREAD_FTD
+    , mChildSupervisor(*this)
+#endif
+    , mSupervisionListener(*this)
+#endif
+    , mAnnounceBegin(*this)
+    , mPanIdQuery(*this)
+    , mEnergyScan(*this)
+#if OPENTHREAD_CONFIG_TMF_ANYCAST_LOCATOR_ENABLE
+    , mAnycastLocator(*this)
+#endif
+#if OPENTHREAD_CONFIG_TIME_SYNC_ENABLE
+    , mTimeSync(*this)
+#endif
+#if OPENTHREAD_CONFIG_MLE_LINK_METRICS_INITIATOR_ENABLE || OPENTHREAD_CONFIG_MLE_LINK_METRICS_SUBJECT_ENABLE
+    , mLinkMetrics(*this)
+#endif
 #if OPENTHREAD_CONFIG_COAP_API_ENABLE
     , mApplicationCoap(*this)
 #endif
@@ -190,7 +304,7 @@ void Instance::AfterInit(void)
     // Restore datasets and network information
 
     Get<Settings>().Init();
-    IgnoreError(Get<Mle::MleRouter>().Restore());
+    Get<Mle::MleRouter>().Restore();
 
 #if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
     Get<Trel::Link>().AfterInit();
@@ -234,6 +348,7 @@ exit:
 }
 
 #if OPENTHREAD_MTD || OPENTHREAD_FTD
+
 void Instance::FactoryReset(void)
 {
     Get<Settings>().Wipe();
@@ -251,6 +366,55 @@ exit:
     return error;
 }
 
+void Instance::GetBufferInfo(BufferInfo &aInfo)
+{
+    aInfo.Clear();
+
+    aInfo.mTotalBuffers = Get<MessagePool>().GetTotalBufferCount();
+    aInfo.mFreeBuffers  = Get<MessagePool>().GetFreeBufferCount();
+
+    Get<MeshForwarder>().GetSendQueue().GetInfo(aInfo.m6loSendQueue);
+    Get<MeshForwarder>().GetReassemblyQueue().GetInfo(aInfo.m6loReassemblyQueue);
+    Get<Ip6::Ip6>().GetSendQueue().GetInfo(aInfo.mIp6Queue);
+
+#if OPENTHREAD_FTD
+    Get<Ip6::Mpl>().GetBufferedMessageSet().GetInfo(aInfo.mMplQueue);
+#endif
+
+    Get<Mle::MleRouter>().GetMessageQueue().GetInfo(aInfo.mMleQueue);
+
+    Get<Tmf::Agent>().GetRequestMessages().GetInfo(aInfo.mCoapQueue);
+    Get<Tmf::Agent>().GetCachedResponses().GetInfo(aInfo.mCoapQueue);
+
+#if OPENTHREAD_CONFIG_DTLS_ENABLE
+    Get<Coap::CoapSecure>().GetRequestMessages().GetInfo(aInfo.mCoapSecureQueue);
+    Get<Coap::CoapSecure>().GetCachedResponses().GetInfo(aInfo.mCoapSecureQueue);
+#endif
+
+#if OPENTHREAD_CONFIG_COAP_API_ENABLE
+    GetApplicationCoap().GetRequestMessages().GetInfo(aInfo.mApplicationCoapQueue);
+    GetApplicationCoap().GetCachedResponses().GetInfo(aInfo.mApplicationCoapQueue);
+#endif
+}
+
 #endif // OPENTHREAD_MTD || OPENTHREAD_FTD
+
+#if OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE
+
+void Instance::SetLogLevel(LogLevel aLogLevel)
+{
+    if (aLogLevel != sLogLevel)
+    {
+        sLogLevel = aLogLevel;
+        otPlatLogHandleLevelChanged(sLogLevel);
+    }
+}
+
+extern "C" OT_TOOL_WEAK void otPlatLogHandleLevelChanged(otLogLevel aLogLevel)
+{
+    OT_UNUSED_VARIABLE(aLogLevel);
+}
+
+#endif
 
 } // namespace ot
