@@ -39,6 +39,7 @@
 
 #include <openthread/dataset.h>
 
+#include "common/as_core_type.hpp"
 #include "common/clearable.hpp"
 #include "common/const_cast.hpp"
 #include "common/locator.hpp"
@@ -202,7 +203,7 @@ public:
          * @returns The Active Timestamp in the Dataset.
          *
          */
-        uint64_t GetActiveTimestamp(void) const { return mActiveTimestamp; }
+        void GetActiveTimestamp(Timestamp &aTimestamp) const { aTimestamp.SetFromTimestamp(mActiveTimestamp); }
 
         /**
          * This method sets the Active Timestamp in the Dataset.
@@ -210,9 +211,9 @@ public:
          * @param[in] aTimestamp   A Timestamp value.
          *
          */
-        void SetActiveTimestamp(uint64_t aTimestamp)
+        void SetActiveTimestamp(const Timestamp &aTimestamp)
         {
-            mActiveTimestamp                      = aTimestamp;
+            aTimestamp.ConvertTo(mActiveTimestamp);
             mComponents.mIsActiveTimestampPresent = true;
         }
 
@@ -233,7 +234,7 @@ public:
          * @returns The Pending Timestamp in the Dataset.
          *
          */
-        uint64_t GetPendingTimestamp(void) const { return mPendingTimestamp; }
+        void GetPendingTimestamp(Timestamp &aTimestamp) const { aTimestamp.SetFromTimestamp(mPendingTimestamp); }
 
         /**
          * This method sets the Pending Timestamp in the Dataset.
@@ -241,9 +242,9 @@ public:
          * @param[in] aTimestamp   A Timestamp value.
          *
          */
-        void SetPendingTimestamp(uint64_t aTimestamp)
+        void SetPendingTimestamp(const Timestamp &aTimestamp)
         {
-            mPendingTimestamp                      = aTimestamp;
+            aTimestamp.ConvertTo(mPendingTimestamp);
             mComponents.mIsPendingTimestampPresent = true;
         }
 
@@ -264,7 +265,7 @@ public:
          * @returns The Network Key in the Dataset.
          *
          */
-        const NetworkKey &GetNetworkKey(void) const { return static_cast<const NetworkKey &>(mNetworkKey); }
+        const NetworkKey &GetNetworkKey(void) const { return AsCoreType(&mNetworkKey); }
 
         /**
          * This method sets the Network Key in the Dataset.
@@ -287,7 +288,7 @@ public:
         NetworkKey &UpdateNetworkKey(void)
         {
             mComponents.mIsNetworkKeyPresent = true;
-            return static_cast<NetworkKey &>(mNetworkKey);
+            return AsCoreType(&mNetworkKey);
         }
 
         /**
@@ -307,10 +308,7 @@ public:
          * @returns The Network Name in the Dataset.
          *
          */
-        const Mac::NetworkName &GetNetworkName(void) const
-        {
-            return static_cast<const Mac::NetworkName &>(mNetworkName);
-        }
+        const NetworkName &GetNetworkName(void) const { return AsCoreType(&mNetworkName); }
 
         /**
          * This method sets the Network Name in the Dataset.
@@ -318,9 +316,9 @@ public:
          * @param[in] aNetworkNameData   A Network Name Data.
          *
          */
-        void SetNetworkName(const Mac::NameData &aNetworkNameData)
+        void SetNetworkName(const NameData &aNetworkNameData)
         {
-            IgnoreError(static_cast<Mac::NetworkName &>(mNetworkName).Set(aNetworkNameData));
+            IgnoreError(AsCoreType(&mNetworkName).Set(aNetworkNameData));
             mComponents.mIsNetworkNamePresent = true;
         }
 
@@ -341,10 +339,7 @@ public:
          * @returns The Extended PAN ID in the Dataset.
          *
          */
-        const Mac::ExtendedPanId &GetExtendedPanId(void) const
-        {
-            return static_cast<const Mac::ExtendedPanId &>(mExtendedPanId);
-        }
+        const ExtendedPanId &GetExtendedPanId(void) const { return AsCoreType(&mExtendedPanId); }
 
         /**
          * This method sets the Extended PAN ID in the Dataset.
@@ -352,7 +347,7 @@ public:
          * @param[in] aExtendedPanId   An Extended PAN ID.
          *
          */
-        void SetExtendedPanId(const Mac::ExtendedPanId &aExtendedPanId)
+        void SetExtendedPanId(const ExtendedPanId &aExtendedPanId)
         {
             mExtendedPanId                      = aExtendedPanId;
             mComponents.mIsExtendedPanIdPresent = true;
@@ -375,9 +370,9 @@ public:
          * @returns The Mesh Local Prefix in the Dataset.
          *
          */
-        const Mle::MeshLocalPrefix &GetMeshLocalPrefix(void) const
+        const Ip6::NetworkPrefix &GetMeshLocalPrefix(void) const
         {
-            return static_cast<const Mle::MeshLocalPrefix &>(mMeshLocalPrefix);
+            return static_cast<const Ip6::NetworkPrefix &>(mMeshLocalPrefix);
         }
 
         /**
@@ -386,7 +381,7 @@ public:
          * @param[in] aMeshLocalPrefix   A Mesh Local Prefix.
          *
          */
-        void SetMeshLocalPrefix(const Mle::MeshLocalPrefix &aMeshLocalPrefix)
+        void SetMeshLocalPrefix(const Ip6::NetworkPrefix &aMeshLocalPrefix)
         {
             mMeshLocalPrefix                      = aMeshLocalPrefix;
             mComponents.mIsMeshLocalPrefixPresent = true;
@@ -414,7 +409,7 @@ public:
         /**
          * This method sets the Delay Timer in the Dataset.
          *
-         * @param[in] aDely   A Delay value.
+         * @param[in] aDelay  A Delay value.
          *
          */
         void SetDelay(uint32_t aDelay)
@@ -501,7 +496,7 @@ public:
          * @returns The PSKc in the Dataset.
          *
          */
-        const Pskc &GetPskc(void) const { return static_cast<const Pskc &>(mPskc); }
+        const Pskc &GetPskc(void) const { return AsCoreType(&mPskc); }
 
         /**
          * This method set the PSKc in the Dataset.
@@ -532,10 +527,7 @@ public:
          * @returns The Security Policy in the Dataset.
          *
          */
-        const SecurityPolicy &GetSecurityPolicy(void) const
-        {
-            return static_cast<const SecurityPolicy &>(mSecurityPolicy);
-        }
+        const SecurityPolicy &GetSecurityPolicy(void) const { return AsCoreType(&mSecurityPolicy); }
 
         /**
          * This method sets the Security Policy in the Dataset.
@@ -635,7 +627,7 @@ public:
      *
      * @param[in] aType  A TLV type.
      *
-     * @returns A pointer to the TLV or nullptr if none is found.
+     * @returns A pointer to the TLV or `nullptr` if none is found.
      *
      */
     Tlv *GetTlv(Tlv::Type aType) { return AsNonConst(AsConst(this)->GetTlv(aType)); }
@@ -645,7 +637,7 @@ public:
      *
      * @param[in] aType  The TLV type.
      *
-     * @returns A pointer to the TLV or nullptr if none is found.
+     * @returns A pointer to the TLV or `nullptr` if none is found.
      *
      */
     const Tlv *GetTlv(Tlv::Type aType) const;
@@ -653,23 +645,23 @@ public:
     /**
      * This template method returns a pointer to the TLV with a given template type `TlvType`
      *
-     * @returns A pointer to the TLV or nullptr if none is found.
+     * @returns A pointer to the TLV or `nullptr` if none is found.
      *
      */
     template <typename TlvType> TlvType *GetTlv(void)
     {
-        return static_cast<TlvType *>(GetTlv(static_cast<Tlv::Type>(TlvType::kType)));
+        return As<TlvType>(GetTlv(static_cast<Tlv::Type>(TlvType::kType)));
     }
 
     /**
      * This template method returns a pointer to the TLV with a given template type `TlvType`
      *
-     * @returns A pointer to the TLV or nullptr if none is found.
+     * @returns A pointer to the TLV or `nullptr` if none is found.
      *
      */
     template <typename TlvType> const TlvType *GetTlv(void) const
     {
-        return static_cast<const TlvType *>(GetTlv(static_cast<Tlv::Type>(TlvType::kType)));
+        return As<TlvType>(GetTlv(static_cast<Tlv::Type>(TlvType::kType)));
     }
 
     /**
@@ -793,17 +785,17 @@ public:
     }
 
     /**
-     * This method sets the Dataset using TLVs stored in a message buffer.
+     * This method reads the Dataset from a given message and checks that it is well-formed and valid.
      *
-     * @param[in]  aMessage  The message buffer.
-     * @param[in]  aOffset   The message buffer offset where the dataset starts.
-     * @param[in]  aLength   The TLVs length in the message buffer in bytes.
+     * @param[in]  aMessage  The message to read from.
+     * @param[in]  aOffset   The offset in @p aMessage to start reading the Dataset TLVs.
+     * @param[in]  aLength   The dataset length in bytes.
      *
-     * @retval kErrorNone         Successfully set the Dataset.
-     * @retval kErrorInvalidArgs  The values of @p aOffset and @p aLength are not valid for @p aMessage.
+     * @retval kErrorNone    Successfully read and validated the Dataset.
+     * @retval kErrorParse   Could not read or parse the dataset from @p aMessage.
      *
      */
-    Error Set(const Message &aMessage, uint16_t aOffset, uint8_t aLength);
+    Error ReadFromMessage(const Message &aMessage, uint16_t aOffset, uint8_t aLength);
 
     /**
      * This method sets the Dataset using an existing Dataset.
@@ -963,6 +955,10 @@ template <> inline Error Dataset::SetTlv(Tlv::Type aType, const uint32_t &aValue
 }
 
 } // namespace MeshCoP
+
+DefineCoreType(otOperationalDatasetComponents, MeshCoP::Dataset::Components);
+DefineCoreType(otOperationalDataset, MeshCoP::Dataset::Info);
+
 } // namespace ot
 
 #endif // MESHCOP_DATASET_HPP_
