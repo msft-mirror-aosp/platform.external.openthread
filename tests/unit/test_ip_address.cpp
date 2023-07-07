@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2019, The OpenThread Authors.
+ *  Copyright (c) 2019-2022, The OpenThread Authors.
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -29,13 +29,10 @@
 #include <limits.h>
 
 #include "common/encoding.hpp"
-#include "net/ip4_address.hpp"
+#include "net/ip4_types.hpp"
 #include "net/ip6_address.hpp"
-#include "net/ip6_headers.hpp"
 
 #include "test_util.h"
-
-using ot::Encoding::BigEndian::ReadUint16;
 
 template <typename AddressType> struct TestVector
 {
@@ -278,6 +275,17 @@ void TestIp6AddressSetPrefix(void)
     }
 }
 
+ot::Ip6::Prefix PrefixFrom(const char *aAddressString, uint8_t aPrefixLength)
+{
+    ot::Ip6::Prefix  prefix;
+    ot::Ip6::Address address;
+
+    SuccessOrQuit(address.FromString(aAddressString));
+    prefix.Set(address.GetBytes(), aPrefixLength);
+
+    return prefix;
+}
+
 void TestIp6Prefix(void)
 {
     const uint8_t kPrefixes[][OT_IP6_ADDRESS_SIZE] = {
@@ -355,6 +363,38 @@ void TestIp6Prefix(void)
             }
         }
     }
+
+    {
+        struct TestCase
+        {
+            ot::Ip6::Prefix mPrefixA;
+            ot::Ip6::Prefix mPrefixB;
+        };
+
+        TestCase kTestCases[] = {
+            {PrefixFrom("fd00::", 16), PrefixFrom("fd01::", 16)},
+            {PrefixFrom("fc00::", 16), PrefixFrom("fd00::", 16)},
+            {PrefixFrom("fd00::", 15), PrefixFrom("fd00::", 16)},
+            {PrefixFrom("fd00::", 16), PrefixFrom("fd00:0::", 32)},
+            {PrefixFrom("2001:0:0:0::", 64), PrefixFrom("fd00::", 8)},
+            {PrefixFrom("2001:dba::", 32), PrefixFrom("fd12:3456:1234:abcd::", 64)},
+            {PrefixFrom("910b:1000:0::", 48), PrefixFrom("910b:2000::", 32)},
+            {PrefixFrom("::", 0), PrefixFrom("fd00::", 8)},
+            {PrefixFrom("::", 0), PrefixFrom("::", 16)},
+            {PrefixFrom("fd00:2:2::", 33), PrefixFrom("fd00:2:2::", 35)},
+            {PrefixFrom("1:2:3:ffff::", 62), PrefixFrom("1:2:3:ffff::", 63)},
+        };
+
+        printf("\nCompare Prefixes:\n");
+
+        for (const TestCase &testCase : kTestCases)
+        {
+            printf(" %26s  <  %s\n", testCase.mPrefixA.ToString().AsCString(),
+                   testCase.mPrefixB.ToString().AsCString());
+            VerifyOrQuit(testCase.mPrefixA < testCase.mPrefixB);
+            VerifyOrQuit(!(testCase.mPrefixB < testCase.mPrefixA));
+        }
+    }
 }
 
 void TestIp4Ip6Translation(void)
@@ -405,61 +445,73 @@ void TestIp4Ip6Translation(void)
 
         VerifyOrQuit(address == expectedAddress, "Ip6::SynthesizeFromIp4Address() failed");
     }
+
+    for (const TestCase &testCase : kTestCases)
+    {
+        const ot::Ip4::Address expectedAddress = ip4Address;
+        ot::Ip4::Address       address;
+        ot::Ip6::Address       ip6Address;
+
+        SuccessOrQuit(ip6Address.FromString(testCase.mIp6Address));
+
+        address.ExtractFromIp6Address(testCase.mLength, ip6Address);
+
+        printf("Ipv6Address: %-36s IPv4Addr: %-12s Expected: %s\n", testCase.mIp6Address,
+               address.ToString().AsCString(), expectedAddress.ToString().AsCString());
+
+        VerifyOrQuit(address == expectedAddress, "Ip4::ExtractFromIp6Address() failed");
+    }
 }
 
-void TestIp6Header(void)
+void TestIp4Cidr(void)
 {
-    ot::Ip6::Header  header;
-    ot::Ip6::Address source;
-    ot::Ip6::Address destination;
-    const uint8_t *  headerBytes = reinterpret_cast<const uint8_t *>(&header);
-
-    enum : uint16_t
+    using ot::Encoding::BigEndian::HostSwap32;
+    struct TestCase
     {
-        kPayloadLength = 650,
+        const char *   mNetwork;
+        const uint8_t  mLength;
+        const uint32_t mHost;
+        const char *   mOutcome;
     };
 
-    enum : uint8_t
-    {
-        kHopLimit = 0xd1,
+    const TestCase kTestCases[] = {
+        {"172.16.12.34", 32, 0x12345678, "172.16.12.34"},  {"172.16.12.34", 31, 0x12345678, "172.16.12.34"},
+        {"172.16.12.34", 30, 0x12345678, "172.16.12.32"},  {"172.16.12.34", 29, 0x12345678, "172.16.12.32"},
+        {"172.16.12.34", 28, 0x12345678, "172.16.12.40"},  {"172.16.12.34", 27, 0x12345678, "172.16.12.56"},
+        {"172.16.12.34", 26, 0x12345678, "172.16.12.56"},  {"172.16.12.34", 25, 0x12345678, "172.16.12.120"},
+        {"172.16.12.34", 24, 0x12345678, "172.16.12.120"}, {"172.16.12.34", 23, 0x12345678, "172.16.12.120"},
+        {"172.16.12.34", 22, 0x12345678, "172.16.14.120"}, {"172.16.12.34", 21, 0x12345678, "172.16.14.120"},
+        {"172.16.12.34", 20, 0x12345678, "172.16.6.120"},  {"172.16.12.34", 19, 0x12345678, "172.16.22.120"},
+        {"172.16.12.34", 18, 0x12345678, "172.16.22.120"}, {"172.16.12.34", 17, 0x12345678, "172.16.86.120"},
+        {"172.16.12.34", 16, 0x12345678, "172.16.86.120"}, {"172.16.12.34", 15, 0x12345678, "172.16.86.120"},
+        {"172.16.12.34", 14, 0x12345678, "172.16.86.120"}, {"172.16.12.34", 13, 0x12345678, "172.20.86.120"},
+        {"172.16.12.34", 12, 0x12345678, "172.20.86.120"}, {"172.16.12.34", 11, 0x12345678, "172.20.86.120"},
+        {"172.16.12.34", 10, 0x12345678, "172.52.86.120"}, {"172.16.12.34", 9, 0x12345678, "172.52.86.120"},
+        {"172.16.12.34", 8, 0x12345678, "172.52.86.120"},  {"172.16.12.34", 7, 0x12345678, "172.52.86.120"},
+        {"172.16.12.34", 6, 0x12345678, "174.52.86.120"},  {"172.16.12.34", 5, 0x12345678, "170.52.86.120"},
+        {"172.16.12.34", 4, 0x12345678, "162.52.86.120"},  {"172.16.12.34", 3, 0x12345678, "178.52.86.120"},
+        {"172.16.12.34", 2, 0x12345678, "146.52.86.120"},  {"172.16.12.34", 1, 0x12345678, "146.52.86.120"},
+        {"172.16.12.34", 0, 0x12345678, "18.52.86.120"},
     };
 
-    memset(&header, 0, sizeof(header));
+    for (const TestCase &testCase : kTestCases)
+    {
+        ot::Ip4::Address network;
+        ot::Ip4::Cidr    cidr;
+        ot::Ip4::Address generated;
 
-    SuccessOrQuit(source.FromString("0102:0304:0506:0708:090a:0b0c:0d0e:0f12"), "Address::FromString() failed");
-    SuccessOrQuit(destination.FromString("1122:3344:5566::7788:99aa:bbcc:ddee:ff23"), "Address::FromString() failed");
+        SuccessOrQuit(network.FromString(testCase.mNetwork));
+        cidr.mAddress = network;
+        cidr.mLength  = testCase.mLength;
 
-    header.Init();
-    VerifyOrQuit(header.IsVersion6(), "Header::Init() failed");
+        generated.SynthesizeFromCidrAndHost(cidr, testCase.mHost);
 
-    header.SetDscp(ot::Ip6::kDscpCs7);
-    header.SetPayloadLength(kPayloadLength);
-    header.SetNextHeader(ot::Ip6::kProtoUdp);
-    header.SetHopLimit(kHopLimit);
-    header.SetSource(source);
-    header.SetDestination(destination);
+        printf("CIDR: %-18s HostID: %-8x Host: %-14s Expected: %s\n", cidr.ToString().AsCString(), testCase.mHost,
+               generated.ToString().AsCString(), testCase.mOutcome);
 
-    VerifyOrQuit(header.IsValid());
-    VerifyOrQuit(header.IsVersion6());
-
-    VerifyOrQuit(header.GetDscp() == ot::Ip6::kDscpCs7);
-    VerifyOrQuit(header.GetPayloadLength() == kPayloadLength);
-    VerifyOrQuit(header.GetNextHeader() == ot::Ip6::kProtoUdp);
-    VerifyOrQuit(header.GetHopLimit() == kHopLimit);
-    VerifyOrQuit(header.GetSource() == source);
-    VerifyOrQuit(header.GetDestination() == destination);
-
-    // Verify the offsets to different fields.
-
-    VerifyOrQuit(ReadUint16(headerBytes + ot::Ip6::Header::kPayloadLengthFieldOffset) == kPayloadLength,
-                 "kPayloadLengthFieldOffset is incorrect");
-    VerifyOrQuit(headerBytes[ot::Ip6::Header::kNextHeaderFieldOffset] == ot::Ip6::kProtoUdp,
-                 "kNextHeaderFieldOffset is incorrect");
-    VerifyOrQuit(headerBytes[ot::Ip6::Header::kHopLimitFieldOffset] == kHopLimit, "kHopLimitFieldOffset is incorrect");
-    VerifyOrQuit(memcmp(&headerBytes[ot::Ip6::Header::kSourceFieldOffset], &source, sizeof(source)) == 0,
-                 "kSourceFieldOffset is incorrect");
-    VerifyOrQuit(memcmp(&headerBytes[ot::Ip6::Header::kDestinationFieldOffset], &destination, sizeof(destination)) == 0,
-                 "kSourceFieldOffset is incorrect");
+        VerifyOrQuit(strcmp(generated.ToString().AsCString(), testCase.mOutcome) == 0,
+                     "Ip4::Address::SynthesizeFromCidrAndHost() failed");
+    }
 }
 
 int main(void)
@@ -469,7 +521,7 @@ int main(void)
     TestIp6AddressFromString();
     TestIp6Prefix();
     TestIp4Ip6Translation();
-    TestIp6Header();
+    TestIp4Cidr();
     printf("All tests passed\n");
     return 0;
 }

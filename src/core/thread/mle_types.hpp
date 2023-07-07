@@ -42,13 +42,16 @@
 
 #include <openthread/thread.h>
 
+#include "common/as_core_type.hpp"
 #include "common/clearable.hpp"
 #include "common/code_utils.hpp"
 #include "common/encoding.hpp"
 #include "common/equatable.hpp"
 #include "common/string.hpp"
 #include "mac/mac_types.hpp"
+#include "meshcop/extended_panid.hpp"
 #include "net/ip6_address.hpp"
+#include "thread/network_data_types.hpp"
 
 namespace ot {
 namespace Mle {
@@ -97,6 +100,7 @@ constexpr uint32_t kMaxResponseDelay               = 1000; ///< Max response del
 constexpr uint32_t kMaxChildIdRequestTimeout       = 5000; ///< Max delay to rx a Child ID Request (in msec)
 constexpr uint32_t kMaxChildUpdateResponseTimeout  = 2000; ///< Max delay to rx a Child Update Response (in msec)
 constexpr uint32_t kMaxLinkRequestTimeout          = 2000; ///< Max delay to rx a Link Accept
+constexpr uint8_t  kMulticastLinkRequestDelay      = 5;    ///< Max delay for sending a mcast Link Request (in sec)
 
 constexpr uint32_t kMinTimeoutKeepAlive = (((kMaxChildKeepAliveAttempts + 1) * kUnicastRetransmissionDelay) / 1000);
 constexpr uint32_t kMinPollPeriod       = OPENTHREAD_CONFIG_MAC_MINIMUM_POLL_PERIOD;
@@ -158,6 +162,13 @@ constexpr uint8_t kRouterSelectionJitter      = 120; ///< (in sec)
 constexpr uint8_t kRouterDowngradeThreshold = 23;
 constexpr uint8_t kRouterUpgradeThreshold   = 16;
 
+/**
+ * Threshold to accept a router upgrade request with reason `kBorderRouterRequest` (number of BRs acting as router in
+ * Network Data).
+ *
+ */
+constexpr uint8_t kRouterUpgradeBorderRouterRequestThreshold = 2;
+
 constexpr uint32_t kMaxLeaderToRouterTimeout = 90;  ///< (in sec)
 constexpr uint32_t kReedAdvertiseInterval    = 570; ///< (in sec)
 constexpr uint32_t kReedAdvertiseJitter      = 60;  ///< (in sec)
@@ -192,19 +203,6 @@ enum DeviceRole : uint8_t
     kRoleLeader   = OT_DEVICE_ROLE_LEADER,   ///< The Thread Leader role.
 };
 
-/**
- * MLE Attach modes
- *
- */
-enum AttachMode : uint8_t
-{
-    kAttachAny           = 0, ///< Attach to any Thread partition.
-    kAttachSame1         = 1, ///< Attach to the same Thread partition (attempt 1 when losing connectivity).
-    kAttachSame2         = 2, ///< Attach to the same Thread partition (attempt 2 when losing connectivity).
-    kAttachBetter        = 3, ///< Attach to a better (i.e. higher weight/partition id) Thread partition.
-    kAttachSameDowngrade = 4, ///< Attach to the same Thread partition during downgrade process.
-};
-
 constexpr uint16_t kAloc16Leader                      = 0xfc00;
 constexpr uint16_t kAloc16DhcpAgentStart              = 0xfc01;
 constexpr uint16_t kAloc16DhcpAgentEnd                = 0xfc0f;
@@ -219,6 +217,18 @@ constexpr uint16_t kAloc16NeighborDiscoveryAgentEnd   = 0xfc4e;
 
 constexpr uint8_t kServiceMinId = 0x00; ///< Minimal Service ID.
 constexpr uint8_t kServiceMaxId = 0x0f; ///< Maximal Service ID.
+
+/**
+ * This enumeration specifies the leader role start mode.
+ *
+ * The start mode indicates whether device is starting normally as leader or restoring its role after reset.
+ *
+ */
+enum LeaderStartMode : uint8_t
+{
+    kStartingAsLeader,              ///< Starting as leader normally.
+    kRestoringLeaderRoleAfterReset, ///< Restoring leader role after reset.
+};
 
 #if OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2
 
@@ -379,13 +389,15 @@ public:
     bool IsFullThreadDevice(void) const { return (mMode & kModeFullThreadDevice) != 0; }
 
     /**
-     * This method indicates whether or not the device requests Full Network Data.
+     * This method gets the Network Data type (full set or stable subset) that the device requests.
      *
-     * @retval TRUE   If the device requests Full Network Data.
-     * @retval FALSE  If the device does not request Full Network Data (only stable Network Data).
+     * @returns The Network Data type requested by this device.
      *
      */
-    bool IsFullNetworkData(void) const { return (mMode & kModeFullNetworkData) != 0; }
+    NetworkData::Type GetNetworkDataType(void) const
+    {
+        return (mMode & kModeFullNetworkData) ? NetworkData::kFullSet : NetworkData::kStableSubset;
+    }
 
     /**
      * This method indicates whether or not the device is a Minimal End Device.
@@ -422,24 +434,6 @@ public:
 private:
     uint8_t mMode;
 };
-
-/**
- * This class represents a Mesh Local Prefix.
- *
- */
-OT_TOOL_PACKED_BEGIN
-class MeshLocalPrefix : public Ip6::NetworkPrefix
-{
-public:
-    /**
-     * This method derives and sets the Mesh Local Prefix from an Extended PAN ID.
-     *
-     * @param[in] aExtendedPanId   An Extended PAN ID.
-     *
-     */
-    void SetFromExtendedPanId(const Mac::ExtendedPanId &aExtendedPanId);
-
-} OT_TOOL_PACKED_END;
 
 /**
  * This class represents the Thread Leader Data.
@@ -481,12 +475,17 @@ public:
     void SetWeighting(uint8_t aWeighting) { mWeighting = aWeighting; }
 
     /**
-     * This method returns the Data Version value.
+     * This method returns the Data Version value for a type (full set or stable subset).
      *
-     * @returns The Data Version value.
+     * @param[in] aType   The Network Data type (full set or stable subset).
+     *
+     * @returns The Data Version value for @p aType.
      *
      */
-    uint8_t GetDataVersion(void) const { return mDataVersion; }
+    uint8_t GetDataVersion(NetworkData::Type aType) const
+    {
+        return (aType == NetworkData::kFullSet) ? mDataVersion : mStableDataVersion;
+    }
 
     /**
      * This method sets the Data Version value.
@@ -495,14 +494,6 @@ public:
      *
      */
     void SetDataVersion(uint8_t aVersion) { mDataVersion = aVersion; }
-
-    /**
-     * This method returns the Stable Data Version value.
-     *
-     * @returns The Stable Data Version value.
-     *
-     */
-    uint8_t GetStableDataVersion(void) const { return mStableDataVersion; }
 
     /**
      * This method sets the Stable Data Version value.
@@ -588,6 +579,10 @@ typedef Mac::Key Key;
  */
 
 } // namespace Mle
+
+DefineCoreType(otLeaderData, Mle::LeaderData);
+DefineMapEnum(otDeviceRole, Mle::DeviceRole);
+
 } // namespace ot
 
 #endif // MLE_TYPES_HPP_

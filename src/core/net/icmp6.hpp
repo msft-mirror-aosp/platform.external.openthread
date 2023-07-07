@@ -38,6 +38,7 @@
 
 #include <openthread/icmp6.h>
 
+#include "common/as_core_type.hpp"
 #include "common/clearable.hpp"
 #include "common/encoding.hpp"
 #include "common/linked_list.hpp"
@@ -59,6 +60,8 @@ using ot::Encoding::BigEndian::HostSwap16;
  * @{
  *
  */
+
+class Headers;
 
 /**
  * This class implements ICMPv6.
@@ -239,7 +242,7 @@ public:
      *
      * @param[in]  aReserved  The number of header bytes to reserve after the ICMP header.
      *
-     * @returns A pointer to the message or nullptr if no buffers are available.
+     * @returns A pointer to the message or `nullptr` if no buffers are available.
      *
      */
     Message *NewMessage(uint16_t aReserved);
@@ -284,6 +287,20 @@ public:
     Error SendError(Header::Type aType, Header::Code aCode, const MessageInfo &aMessageInfo, const Message &aMessage);
 
     /**
+     * This method sends an ICMPv6 error message.
+     *
+     * @param[in]  aType         The ICMPv6 message type.
+     * @param[in]  aCode         The ICMPv6 message code.
+     * @param[in]  aMessageInfo  A reference to the message info.
+     * @param[in]  aHeaders      The parsed headers from the error-causing IPv6 message.
+     *
+     * @retval kErrorNone     Successfully enqueued the ICMPv6 error message.
+     * @retval kErrorNoBufs   Insufficient buffers available.
+     *
+     */
+    Error SendError(Header::Type aType, Header::Code aCode, const MessageInfo &aMessageInfo, const Headers &aHeaders);
+
+    /**
      * This method handles an ICMPv6 message.
      *
      * @param[in]  aMessage      A reference to the ICMPv6 message.
@@ -306,9 +323,9 @@ public:
     otIcmp6EchoMode GetEchoMode(void) const { return mEchoMode; }
 
     /**
-     * This method sets whether or not ICMPv6 Echo processing is enabled.
+     * Sets the ICMPv6 echo mode.
      *
-     * @param[in]  aEnabled  TRUE to enable ICMPv6 Echo processing, FALSE otherwise.
+     * @param[in]  aMode  The ICMPv6 echo mode.
      *
      */
     void SetEchoMode(otIcmp6EchoMode aMode) { mEchoMode = aMode; }
@@ -345,6 +362,10 @@ private:
  */
 
 } // namespace Ip6
+
+DefineCoreType(otIcmp6Header, Ip6::Icmp::Header);
+DefineCoreType(otIcmp6Handler, Ip6::Icmp::Handler);
+
 } // namespace ot
 
 #endif // ICMP6_HPP_
