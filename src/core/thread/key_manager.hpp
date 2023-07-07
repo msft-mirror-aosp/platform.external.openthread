@@ -39,8 +39,9 @@
 #include <stdint.h>
 
 #include <openthread/dataset.h>
-
 #include <openthread/platform/crypto.h>
+
+#include "common/as_core_type.hpp"
 #include "common/clearable.hpp"
 #include "common/encoding.hpp"
 #include "common/equatable.hpp"
@@ -210,9 +211,6 @@ typedef Mac::KeyMaterial KekKeyMaterial;
 class KeyManager : public InstanceLocator, private NonCopyable
 {
 public:
-    static constexpr uint32_t kNetworkKeyPsaItsOffset = OPENTHREAD_CONFIG_PSA_ITS_NVM_OFFSET + 1;
-    static constexpr uint32_t kPskcPsaItsOffset       = OPENTHREAD_CONFIG_PSA_ITS_NVM_OFFSET + 2;
-
     /**
      * This constructor initializes the object.
      *
@@ -553,6 +551,7 @@ public:
 private:
     static constexpr uint32_t kDefaultKeySwitchGuardTime = 624;
     static constexpr uint32_t kOneHourIntervalInMsec     = 3600u * 1000u;
+    static constexpr bool     kExportableMacKeys         = OPENTHREAD_CONFIG_PLATFORM_MAC_KEYS_EXPORTABLE_ENABLE;
 
     OT_TOOL_PACKED_BEGIN
     struct Keys
@@ -635,6 +634,10 @@ private:
 /**
  * @}
  */
+
+DefineCoreType(otSecurityPolicy, SecurityPolicy);
+DefineCoreType(otNetworkKey, NetworkKey);
+DefineCoreType(otPskc, Pskc);
 
 } // namespace ot
 
