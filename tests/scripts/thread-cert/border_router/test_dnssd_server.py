@@ -94,17 +94,17 @@ class TestDnssdServerOnBr(thread_cert.TestCase):
         self.simulator.go(5)
 
         br1.start()
-        self.simulator.go(5)
+        self.simulator.go(config.LEADER_STARTUP_DELAY)
         self.assertEqual('leader', br1.get_state())
         server.srp_server_set_enabled(True)
 
         client1.start()
 
-        self.simulator.go(5)
+        self.simulator.go(config.ROUTER_STARTUP_DELAY)
         self.assertEqual('router', client1.get_state())
 
         client2.start()
-        self.simulator.go(5)
+        self.simulator.go(config.ROUTER_STARTUP_DELAY)
         self.assertEqual('router', client2.get_state())
 
         self.simulator.go(10)
@@ -239,7 +239,7 @@ class TestDnssdServerOnBr(thread_cert.TestCase):
                 'ADDITIONAL': [
                     (dp_instance_name, 'IN', 'SRV', 0, 0, check_border_agent_port, dp_hostname),
                     (dp_instance_name, 'IN', 'TXT', lambda txt: (isinstance(txt, dict) and txt.get(
-                        'nn') == network_name and 'xp' in txt and 'tv' in txt and 'dd' in txt)),
+                        'nn') == network_name and 'xp' in txt and 'tv' in txt and 'xa' in txt)),
                 ],
             })
 
@@ -259,7 +259,7 @@ class TestDnssdServerOnBr(thread_cert.TestCase):
                 'QUESTION': [(dp_instance_name, 'IN', 'SRV'),],
                 'ANSWER': [(dp_instance_name, 'IN', 'SRV', 0, 0, check_border_agent_port, dp_hostname),],
                 'ADDITIONAL': [(dp_instance_name, 'IN', 'TXT', lambda txt: (isinstance(txt, dict) and txt.get(
-                    'nn') == network_name and 'xp' in txt and 'tv' in txt and 'dd' in txt)),],
+                    'nn') == network_name and 'xp' in txt and 'tv' in txt and 'xa' in txt)),],
             })
 
         dig_result = digger.dns_dig(server_addr, dp_instance_name, 'TXT')
@@ -267,7 +267,7 @@ class TestDnssdServerOnBr(thread_cert.TestCase):
             dig_result, {
                 'QUESTION': [(dp_instance_name, 'IN', 'TXT'),],
                 'ANSWER': [(dp_instance_name, 'IN', 'TXT', lambda txt: (isinstance(txt, dict) and txt.get(
-                    'nn') == network_name and 'xp' in txt and 'tv' in txt and 'dd' in txt)),],
+                    'nn') == network_name and 'xp' in txt and 'tv' in txt and 'xa' in txt)),],
                 'ADDITIONAL': [(dp_instance_name, 'IN', 'SRV', 0, 0, check_border_agent_port, dp_hostname),],
             })
 

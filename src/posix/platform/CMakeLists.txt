@@ -37,6 +37,17 @@ if(OT_DAEMON)
     )
 endif()
 
+option(OT_POSIX_INSTALL_EXTERNAL_ROUTES "Install External Routes as IPv6 routes" ON)
+if(OT_POSIX_INSTALL_EXTERNAL_ROUTES)
+    target_compile_definitions(ot-posix-config
+        INTERFACE "OPENTHREAD_POSIX_CONFIG_INSTALL_EXTERNAL_ROUTES_ENABLE=1"
+    )
+else()
+    target_compile_definitions(ot-posix-config
+        INTERFACE "OPENTHREAD_POSIX_CONFIG_INSTALL_EXTERNAL_ROUTES_ENABLE=0"
+    )
+endif()
+
 option(OT_POSIX_VIRTUAL_TIME "enable virtual time" OFF)
 if(OT_POSIX_VIRTUAL_TIME)
     target_compile_definitions(ot-posix-config
@@ -51,6 +62,13 @@ if(OT_POSIX_MAX_POWER_TABLE)
     )
 endif()
 
+option(OT_POSIX_SECURE_SETTINGS "enable secure settings" OFF)
+if (OT_POSIX_SECURE_SETTINGS)
+    target_compile_definitions(ot-posix-config
+        INTERFACE "OPENTHREAD_POSIX_CONFIG_SECURE_SETTINGS_ENABLE=1"
+    )
+endif()
+
 set(OT_POSIX_CONFIG_RCP_BUS "" CACHE STRING "RCP bus type")
 if(OT_POSIX_CONFIG_RCP_BUS)
     target_compile_definitions(ot-posix-config
@@ -62,11 +80,15 @@ if(NOT OT_CONFIG)
     set(OT_CONFIG "openthread-core-posix-config.h" PARENT_SCOPE)
 endif()
 
+set(OT_POSIX_CONFIG_RCP_VENDOR_INTERFACE "vendor_interface_example.cpp"
+       CACHE STRING "vendor interface implementation")
+
 add_library(openthread-posix
     alarm.cpp
     backbone.cpp
     daemon.cpp
     entropy.cpp
+    firewall.cpp
     hdlc_interface.cpp
     infra_if.cpp
     logging.cpp
@@ -80,9 +102,11 @@ add_library(openthread-posix
     settings.cpp
     spi_interface.cpp
     system.cpp
-    trel_udp6.cpp
+    trel.cpp
     udp.cpp
+    utils.cpp
     virtual_time.cpp
+    ${OT_POSIX_CONFIG_RCP_VENDOR_INTERFACE}
 )
 
 target_link_libraries(openthread-posix
