@@ -35,13 +35,14 @@
 
 #include <stdio.h>
 
+#include "common/array.hpp"
 #include "common/as_core_type.hpp"
 #include "common/code_utils.hpp"
 #include "common/encoding.hpp"
 #include "common/instance.hpp"
 #include "common/numeric_limits.hpp"
 #include "common/random.hpp"
-#include "net/ip4_address.hpp"
+#include "net/ip4_types.hpp"
 #include "net/netif.hpp"
 
 using ot::Encoding::BigEndian::HostSwap32;
@@ -76,13 +77,17 @@ bool Prefix::IsEqual(const uint8_t *aPrefixBytes, uint8_t aPrefixLength) const
 bool Prefix::operator<(const Prefix &aOther) const
 {
     bool    isSmaller;
+    uint8_t minLength;
     uint8_t matchedLength;
 
-    VerifyOrExit(GetLength() == aOther.GetLength(), isSmaller = GetLength() < aOther.GetLength());
+    minLength     = OT_MIN(GetLength(), aOther.GetLength());
+    matchedLength = MatchLength(GetBytes(), aOther.GetBytes(), SizeForLength(minLength));
 
-    matchedLength = MatchLength(GetBytes(), aOther.GetBytes(), GetBytesSize());
-
-    VerifyOrExit(matchedLength < GetLength(), isSmaller = false);
+    if (matchedLength >= minLength)
+    {
+        isSmaller = (GetLength() < aOther.GetLength());
+        ExitNow();
+    }
 
     isSmaller = GetBytes()[matchedLength / CHAR_BIT] < aOther.GetBytes()[matchedLength / CHAR_BIT];
 
@@ -119,10 +124,10 @@ uint8_t Prefix::MatchLength(const uint8_t *aPrefixA, const uint8_t *aPrefixB, ui
     return matchedLength;
 }
 
-bool Prefix::IsValidNat64(void) const
+bool Prefix::IsValidNat64PrefixLength(uint8_t aLength)
 {
-    return (mLength == 32) || (mLength == 40) || (mLength == 48) || (mLength == 56) || (mLength == 64) ||
-           (mLength == 96);
+    return (aLength == 32) || (aLength == 40) || (aLength == 48) || (aLength == 56) || (aLength == 64) ||
+           (aLength == 96);
 }
 
 Prefix::InfoString Prefix::ToString(void) const
@@ -613,7 +618,7 @@ Error Address::FromString(const char *aString)
         Ip4::Address ip4Addr;
 
         SuccessOrExit(error = ip4Addr.FromString(aString));
-        memcpy(OT_ARRAY_END(mFields.m8) - Ip4::Address::kSize, ip4Addr.GetBytes(), Ip4::Address::kSize);
+        memcpy(GetArrayEnd(mFields.m8) - Ip4::Address::kSize, ip4Addr.GetBytes(), Ip4::Address::kSize);
     }
 
     error = kErrorNone;
@@ -639,7 +644,7 @@ void Address::ToString(char *aBuffer, uint16_t aSize) const
 
 void Address::ToString(StringWriter &aWriter) const
 {
-    AppendHexWords(aWriter, OT_ARRAY_LENGTH(mFields.m16));
+    AppendHexWords(aWriter, static_cast<uint8_t>(GetArrayLength(mFields.m16)));
 }
 
 void Address::AppendHexWords(StringWriter &aWriter, uint8_t aLength) const
