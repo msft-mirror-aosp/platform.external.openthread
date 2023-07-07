@@ -45,6 +45,8 @@
 #include <openthread/instance.h>
 #include <openthread/platform/misc.h>
 
+#include "lib/spinel/radio_spinel_metrics.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -81,6 +83,22 @@ typedef struct otPlatformConfig
     bool        mDryRun;                                       ///< If 'DryRun' is set, the posix daemon will exit
                                                                ///< directly after initialization.
 } otPlatformConfig;
+
+/**
+ * This structure represents RCP interface metrics.
+ *
+ */
+typedef struct otRcpInterfaceMetrics
+{
+    uint8_t  mRcpInterfaceType;             ///< The RCP interface type.
+    uint64_t mTransferredFrameCount;        ///< The number of transferred frames.
+    uint64_t mTransferredValidFrameCount;   ///< The number of transferred valid frames.
+    uint64_t mTransferredGarbageFrameCount; ///< The number of transferred garbage frames.
+    uint64_t mRxFrameCount;                 ///< The number of received frames.
+    uint64_t mRxFrameByteCount;             ///< The number of received bytes.
+    uint64_t mTxFrameCount;                 ///< The number of transmitted frames.
+    uint64_t mTxFrameByteCount;             ///< The number of transmitted bytes.
+} otRcpInterfaceMetrics;
 
 /**
  * This function performs all platform-specific initialization of OpenThread's drivers and initializes the OpenThread
@@ -123,7 +141,7 @@ typedef struct otSysMainloopContext
  * This function updates the file descriptor sets with file descriptors used by OpenThread drivers.
  *
  * @param[in]       aInstance   The OpenThread instance structure.
- * @param[inout]    aMainloop   A pointer to the mainloop context.
+ * @param[in,out]   aMainloop   A pointer to the mainloop context.
  *
  */
 void otSysMainloopUpdate(otInstance *aInstance, otSysMainloopContext *aMainloop);
@@ -131,7 +149,7 @@ void otSysMainloopUpdate(otInstance *aInstance, otSysMainloopContext *aMainloop)
 /**
  * This function polls OpenThread's mainloop.
  *
- * @param[inout]    aMainloop   A pointer to the mainloop context.
+ * @param[in,out]   aMainloop   A pointer to the mainloop context.
  *
  * @returns value returned from select().
  *
@@ -175,6 +193,30 @@ const char *otSysGetThreadNetifName(void);
  *
  */
 unsigned int otSysGetThreadNetifIndex(void);
+
+/**
+ * This method returns the infrastructure network interface name.
+ *
+ * @returns The infrastructure network interface name, or `nullptr` if not specified.
+ *
+ */
+const char *otSysGetInfraNetifName(void);
+
+/**
+ * This method returns the radio spinel metrics.
+ *
+ * @returns The radio spinel metrics.
+ *
+ */
+const otRadioSpinelMetrics *otSysGetRadioSpinelMetrics(void);
+
+/**
+ * This method returns the RCP interface metrics.
+ *
+ * @returns The RCP interface metrics.
+ *
+ */
+const otRcpInterfaceMetrics *otSysGetRcpInterfaceMetrics(void);
 
 #ifdef __cplusplus
 } // end of extern "C"
