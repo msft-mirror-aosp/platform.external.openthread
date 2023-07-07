@@ -37,6 +37,7 @@
 #include <openthread/platform/radio.h>
 
 #include "openthread-spinel-config.h"
+#include "radio_spinel_metrics.h"
 #include "spinel.h"
 #include "spinel_interface.hpp"
 #include "core/radio/max_power_table.hpp"
@@ -675,6 +676,54 @@ public:
      */
     otError GetRadioRegion(uint16_t *aRegionCode);
 
+#if OPENTHREAD_CONFIG_MLE_LINK_METRICS_SUBJECT_ENABLE
+    /**
+     * Enable/disable or update Enhanced-ACK Based Probing in radio for a specific Initiator.
+     *
+     * After Enhanced-ACK Based Probing is configured by a specific Probing Initiator, the Enhanced-ACK sent to that
+     * node should include Vendor-Specific IE containing Link Metrics data. This method informs the radio to start/stop
+     * to collect Link Metrics data and include Vendor-Specific IE that containing the data in Enhanced-ACK sent to that
+     * Probing Initiator.
+     *
+     * @param[in]  aLinkMetrics   This parameter specifies what metrics to query. Per spec 4.11.3.4.4.6, at most 2
+     *                            metrics can be specified. The probing would be disabled if @p aLinkMetrics is
+     *                            bitwise 0.
+     * @param[in]  aShortAddress  The short address of the Probing Initiator.
+     * @param[in]  aExtAddress    The extended source address of the Probing Initiator. @p aExtAddress MUST NOT be
+     *                            nullptr.
+     *
+     * @retval  OT_ERROR_NONE            Successfully configured the Enhanced-ACK Based Probing.
+     * @retval  OT_ERROR_INVALID_ARGS    @p aExtAddress is nullptr.
+     * @retval  OT_ERROR_NOT_FOUND       The Initiator indicated by @p aShortAddress is not found when trying to clear.
+     * @retval  OT_ERROR_NO_BUFS         No more Initiator can be supported.
+     */
+    otError ConfigureEnhAckProbing(otLinkMetrics        aLinkMetrics,
+                                   const otShortAddress aShortAddress,
+                                   const otExtAddress & aExtAddress);
+#endif
+
+#if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE || OPENTHREAD_CONFIG_MAC_CSL_TRANSMITTER_ENABLE
+    /**
+     * Get the current accuracy, in units of ± ppm, of the clock used for scheduling CSL operations.
+     *
+     * @note Platforms may optimize this value based on operational conditions (i.e.: temperature).
+     *
+     * @retval   The current CSL rx/tx scheduling drift, in units of ± ppm.
+     *
+     */
+    uint8_t GetCslAccuracy(void);
+#endif
+
+#if OPENTHREAD_CONFIG_MAC_CSL_TRANSMITTER_ENABLE
+    /**
+     * Get the current uncertainty, in units of 10 us, of the clock used for scheduling CSL operations.
+     *
+     * @retval  The current CSL Clock Uncertainty in units of 10 us.
+     *
+     */
+    uint8_t GetCslUncertainty(void);
+#endif
+
     /**
      * This method checks whether the spinel interface is radio-only.
      *
@@ -829,10 +878,18 @@ public:
      */
     otError SendReset(uint8_t aResetType);
 
+    /**
+     * This method returns the radio Spinel metrics.
+     *
+     * @returns The radio Spinel metrics.
+     *
+     */
+    const otRadioSpinelMetrics *GetRadioSpinelMetrics(void) const { return &mRadioSpinelMetrics; }
+
 private:
     enum
     {
-        kMaxSpinelFrame        = SpinelInterface::kMaxFrameSize,
+        kMaxSpinelFrame        = SPINEL_FRAME_MAX_SIZE,
         kMaxWaitTime           = 2000, ///< Max time to wait for response in milliseconds.
         kVersionStringSize     = 128,  ///< Max size of version string.
         kCapsBufferSize        = 100,  ///< Max buffer size used to store `SPINEL_PROP_CAPS` value.
@@ -934,6 +991,10 @@ private:
 #if OPENTHREAD_SPINEL_CONFIG_RCP_RESTORATION_MAX_COUNT > 0
     void RestoreProperties(void);
 #endif
+    void UpdateParseErrorCount(otError aError)
+    {
+        mRadioSpinelMetrics.mSpinelParseErrorCount += (aError == OT_ERROR_PARSE) ? 1 : 0;
+    }
 
     otInstance *mInstance;
 
@@ -1018,6 +1079,8 @@ private:
     int64_t  mRadioTimeOffset;      ///< Time difference with estimated RCP time minus host time.
 
     MaxPowerTable mMaxPowerTable;
+
+    otRadioSpinelMetrics mRadioSpinelMetrics;
 };
 
 } // namespace Spinel
