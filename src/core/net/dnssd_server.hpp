@@ -35,6 +35,7 @@
 
 #include <openthread/dnssd_server.h>
 
+#include "common/as_core_type.hpp"
 #include "common/message.hpp"
 #include "common/non_copyable.hpp"
 #include "common/timer.hpp"
@@ -66,6 +67,14 @@ class Server : public InstanceLocator, private NonCopyable
     friend class Srp::Server;
 
 public:
+    /**
+     * This class contains the counters of the DNS-SD server.
+     *
+     */
+    class Counters : public otDnssdCounters, public Clearable<Counters>
+    {
+    };
+
     /**
      * This enumeration specifies a DNS-SD query type.
      *
@@ -136,9 +145,9 @@ public:
     /**
      * This method acquires the next query in the server.
      *
-     * @param[in] aQuery            The query pointer. Pass nullptr to get the first query.
+     * @param[in] aQuery            The query pointer. Pass `nullptr` to get the first query.
      *
-     * @returns  A pointer to the query or nullptr if no more queries.
+     * @returns  A pointer to the query or `nullptr` if no more queries.
      *
      */
     const otDnssdQuery *GetNextQuery(const otDnssdQuery *aQuery) const;
@@ -146,13 +155,21 @@ public:
     /**
      * This method acquires the DNS-SD query type and name for a specific query.
      *
-     * @param[in]   aQuery            The query pointer.
-     * @param[out]  aNameOutput       The name output buffer.
+     * @param[in]   aQuery      The query pointer.
+     * @param[out]  aName       The name output buffer.
      *
      * @returns The DNS-SD query type.
      *
      */
     static DnsQueryType GetQueryTypeAndName(const otDnssdQuery *aQuery, char (&aName)[Name::kMaxNameSize]);
+
+    /**
+     * This method returns the counters of the DNS-SD server.
+     *
+     * @returns  A reference to the `Counters` instance.
+     *
+     */
+    const Counters &GetCounters(void) const { return mCounters; };
 
 private:
     class NameCompressInfo : public Clearable<NameCompressInfo>
@@ -272,7 +289,7 @@ private:
      * This class contains the compress information for a dns packet.
      *
      */
-    class QueryTransaction
+    class QueryTransaction : public InstanceLocatorInit
     {
     public:
         explicit QueryTransaction(void)
@@ -283,7 +300,8 @@ private:
         void                    Init(const Header &          aResponseHeader,
                                      Message &               aResponseMessage,
                                      const NameCompressInfo &aCompressInfo,
-                                     const Ip6::MessageInfo &aMessageInfo);
+                                     const Ip6::MessageInfo &aMessageInfo,
+                                     Instance &              aInstance);
         bool                    IsValid(void) const { return mResponseMessage != nullptr; }
         const Ip6::MessageInfo &GetMessageInfo(void) const { return mMessageInfo; }
         const Header &          GetResponseHeader(void) const { return mResponseHeader; }
@@ -346,7 +364,7 @@ private:
     static void             IncResourceRecordCount(Header &aHeader, bool aAdditional);
     static Error            FindNameComponents(const char *aName, const char *aDomain, NameComponentsOffsetInfo &aInfo);
     static Error            FindPreviousLabel(const char *aName, uint8_t &aStart, uint8_t &aStop);
-    static void             SendResponse(Header                  aHeader,
+    void                    SendResponse(Header                  aHeader,
                                          Header::Response        aResponseCode,
                                          Message &               aMessage,
                                          const Ip6::MessageInfo &aMessageInfo,
@@ -391,8 +409,10 @@ private:
     void        HandleTimer(void);
     void        ResetTimer(void);
 
-    static const char kDnssdProtocolUdp[4];
-    static const char kDnssdProtocolTcp[4];
+    void UpdateResponseCounters(Header::Response aResponseCode);
+
+    static const char kDnssdProtocolUdp[];
+    static const char kDnssdProtocolTcp[];
     static const char kDnssdSubTypeLabel[];
     static const char kDefaultDomainName[];
     Ip6::Udp::Socket  mSocket;
@@ -402,10 +422,15 @@ private:
     otDnssdQuerySubscribeCallback   mQuerySubscribe;
     otDnssdQueryUnsubscribeCallback mQueryUnsubscribe;
     TimerMilli                      mTimer;
+
+    Counters mCounters;
 };
 
 } // namespace ServiceDiscovery
 } // namespace Dns
+
+DefineMapEnum(otDnssdQueryType, Dns::ServiceDiscovery::Server::DnsQueryType);
+
 } // namespace ot
 
 #endif // OPENTHREAD_CONFIG_DNSSD_SERVER_ENABLE
