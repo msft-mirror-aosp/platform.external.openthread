@@ -128,7 +128,7 @@ public:
         /**
          * This method notifies user of `SubMac` of a received frame.
          *
-         * @param[in]  aFrame    A pointer to the received frame or nullptr if the receive operation failed.
+         * @param[in]  aFrame    A pointer to the received frame or `nullptr` if the receive operation failed.
          * @param[in]  aError    kErrorNone when successfully received a frame,
          *                       kErrorAbort when reception was aborted and a frame was not received,
          *                       kErrorNoBufs when a frame could not be received due to lack of rx buffer space.
@@ -156,7 +156,7 @@ public:
          * of a frame transmission, this method is invoked on all frame transmission attempts.
          *
          * @param[in] aFrame      The transmitted frame.
-         * @param[in] aAckFrame   A pointer to the ACK frame, or nullptr if no ACK was received.
+         * @param[in] aAckFrame   A pointer to the ACK frame, or `nullptr` if no ACK was received.
          * @param[in] aError      kErrorNone when the frame was transmitted successfully,
          *                        kErrorNoAck when the frame was transmitted but no ACK was received,
          *                        kErrorChannelAccessFailure tx failed due to activity on the channel,
@@ -177,7 +177,7 @@ public:
          * the received ACK frame.
          *
          * @param[in]  aFrame     The transmitted frame.
-         * @param[in]  aAckFrame  A pointer to the ACK frame, nullptr if no ACK was received.
+         * @param[in]  aAckFrame  A pointer to the ACK frame, `nullptr` if no ACK was received.
          * @param[in]  aError     kErrorNone when the frame was transmitted,
          *                        kErrorNoAck when the frame was transmitted but no ACK was received,
          *                        kErrorChannelAccessFailure tx failed due to activity on the channel,
@@ -274,7 +274,7 @@ public:
      * This method registers a callback to provide received packet capture for IEEE 802.15.4 frames.
      *
      * @param[in]  aPcapCallback     A pointer to a function that is called when receiving an IEEE 802.15.4 link frame
-     *                                or nullptr to disable the callback.
+     *                               or `nullptr` to disable the callback.
      * @param[in]  aCallbackContext  A pointer to application-specific context.
      *
      */
@@ -379,6 +379,7 @@ public:
      * @param[in] aScanDuration  The duration, in milliseconds, for the channel to be scanned.
      *
      * @retval kErrorNone            Successfully started scanning the channel.
+     * @retval kErrorBusy            The radio is performing energy scanning.
      * @retval kErrorInvalidState    The radio was disabled or transmitting.
      * @retval kErrorNotImplemented  Energy scan is not supported (applicable in link-raw/radio mode only).
      *
@@ -394,69 +395,27 @@ public:
     int8_t GetNoiseFloor(void);
 
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
-
     /**
-     * This method lets `SubMac` start CSL sample.
+     * This method configures CSL parameters in 'SubMac'.
      *
-     * `SubMac` would switch the radio state between `Receive` and `Sleep` according the CSL timer. When CslSample is
-     * started, `mState` will become `kStateCslSample`. But it could be doing `Sleep` or `Receive` at this moment
-     * (depending on `mCslState`).
+     * @param[in]  aPeriod    The CSL period.
+     * @param[in]  aChannel   The CSL channel.
+     * @param[in]  aShortAddr The short source address of CSL receiver's peer.
+     * @param[in]  aExtAddr   The extended source address of CSL receiver's peer.
      *
-     * @param[in]  aPanChannel  The current phy channel used by the device. This param will only take effect when CSL
-     *                          channel hasn't been explicitly specified.
-     *
-     * @retval kErrorNone          Successfully entered CSL operation (sleep or receive according to CSL timer).
-     * @retval kErrorBusy          The radio was transmitting.
-     * @retval kErrorInvalidState  The radio was disabled.
+     * @retval  TRUE if CSL Period or CSL Channel changed.
+     * @retval  FALSE if CSL Period and CSL Channel did not change.
      *
      */
-    Error CslSample(uint8_t aPanChannel);
+    bool UpdateCsl(uint16_t aPeriod, uint8_t aChannel, otShortAddress aShortAddr, const otExtAddress *aExtAddr);
 
     /**
-     * This method gets the CSL channel.
+     * This method lets `SubMac` start CSL sample mode given a configured non-zero CSL period.
      *
-     * @returns CSL channel.
-     *
-     */
-    uint8_t GetCslChannel(void) const { return mCslChannel; }
-
-    /**
-     * This method sets the CSL channel.
-     *
-     * @param[in]  aChannel  The CSL channel. `0` to set CSL Channel unspecified.
+     * `SubMac` would switch the radio state between `Receive` and `Sleep` according the CSL timer.
      *
      */
-    void SetCslChannel(uint8_t aChannel);
-
-    /**
-     * This method indicates if CSL channel has been explicitly specified by the upper layer.
-     *
-     * @returns If CSL channel has been specified.
-     *
-     */
-    bool IsCslChannelSpecified(void) const { return mIsCslChannelSpecified; }
-
-    /**
-     * This method sets the flag representing if CSL channel has been specified.
-     *
-     */
-    void SetCslChannelSpecified(bool aIsSpecified) { mIsCslChannelSpecified = aIsSpecified; }
-
-    /**
-     * This method gets the CSL period.
-     *
-     * @returns CSL period.
-     *
-     */
-    uint16_t GetCslPeriod(void) const { return mCslPeriod; }
-
-    /**
-     * This method sets the CSL period.
-     *
-     * @param[in]  aPeriod  The CSL period in 10 symbols.
-     *
-     */
-    void SetCslPeriod(uint16_t aPeriod);
+    void CslSample(void);
 
     /**
      * This method returns CSL parent clock accuracy, in ± ppm.
@@ -548,18 +507,46 @@ public:
      */
     void SetFrameCounter(uint32_t aFrameCounter);
 
+#if OPENTHREAD_CONFIG_MAC_FILTER_ENABLE
+    /**
+     * This method enables/disables the radio filter.
+     *
+     * When radio filter is enabled, radio is put to sleep instead of receive (to ensure device does not receive any
+     * frame and/or potentially send ack). Also the frame transmission requests return immediately without sending the
+     * frame over the air (return "no ack" error if ack is requested, otherwise return success).
+     *
+     * @param[in] aFilterEnabled    TRUE to enable radio filter, FALSE to disable.
+     *
+     */
+    void SetRadioFilterEnabled(bool aFilterEnabled) { mRadioFilterEnabled = aFilterEnabled; }
+
+    /**
+     * This method indicates whether the radio filter is enabled or not.
+     *
+     * @retval TRUE   If the radio filter is enabled.
+     * @retval FALSE  If the radio filter is disabled.
+     *
+     */
+    bool IsRadioFilterEnabled(void) const { return mRadioFilterEnabled; }
+#endif
+
 private:
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
     static void HandleCslTimer(Timer &aTimer);
     void        HandleCslTimer(void);
-    void        GetCslWindowEdges(uint32_t &ahead, uint32_t &after);
+    void        GetCslWindowEdges(uint32_t &aAhead, uint32_t &aAfter);
 #endif
 
-    static constexpr uint8_t  kMinBE             = 3;   // macMinBE (IEEE 802.15.4-2006).
-    static constexpr uint8_t  kMaxBE             = 5;   // macMaxBE (IEEE 802.15.4-2006).
+    static constexpr uint8_t  kCsmaMinBe         = 3;   // macMinBE (IEEE 802.15.4-2006).
+    static constexpr uint8_t  kCsmaMaxBe         = 5;   // macMaxBE (IEEE 802.15.4-2006).
     static constexpr uint32_t kUnitBackoffPeriod = 20;  // Number of symbols (IEEE 802.15.4-2006).
     static constexpr uint32_t kAckTimeout        = 16;  // Timeout for waiting on an ACK (in msec).
     static constexpr uint32_t kCcaSampleInterval = 128; // CCA sample interval, 128 usec.
+
+#if OPENTHREAD_CONFIG_MAC_ADD_DELAY_ON_NO_ACK_ERROR_BEFORE_RETRY
+    static constexpr uint8_t kRetxDelayMinBackoffExponent = OPENTHREAD_CONFIG_MAC_RETX_DELAY_MIN_BACKOFF_EXPONENT;
+    static constexpr uint8_t kRetxDelayMaxBackoffExponent = OPENTHREAD_CONFIG_MAC_RETX_DELAY_MAX_BACKOFF_EXPONENT;
+#endif
 
 #if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
     static constexpr uint32_t kEnergyScanRssiSampleInterval = 128; // RSSI sample interval for energy scan, 128 usec
@@ -575,6 +562,9 @@ private:
         kStateCsmaBackoff, // CSMA backoff before transmission.
         kStateTransmit,    // Radio is transmitting.
         kStateEnergyScan,  // Energy scan.
+#if OPENTHREAD_CONFIG_MAC_ADD_DELAY_ON_NO_ACK_ERROR_BEFORE_RETRY
+        kStateDelayBeforeRetx, // Delay before retx
+#endif
 #if !OPENTHREAD_MTD && OPENTHREAD_CONFIG_MAC_CSL_TRANSMITTER_ENABLE
         kStateCslTransmit, // CSL transmission.
 #endif
@@ -591,12 +581,6 @@ private:
     // CSL receivers would wake up `kCslReceiveTimeAhead` earlier
     // than expected sample window. The value is in usec.
     static constexpr uint32_t kCslReceiveTimeAhead = OPENTHREAD_CONFIG_CSL_RECEIVE_TIME_AHEAD;
-
-    enum CslState : uint8_t{
-        kCslIdle,   // CSL receiver is not started.
-        kCslSample, // Sampling CSL channel.
-        kCslSleep,  // Radio in sleep.
-    };
 #endif
 
     /**
@@ -627,6 +611,7 @@ private:
     void ProcessTransmitSecurity(void);
     void SignalFrameCounterUsed(uint32_t aFrameCounter);
     void StartCsmaBackoff(void);
+    void StartTimerForBackoff(uint8_t aBackoffExponent);
     void BeginTransmit(void);
     void SampleRssi(void);
 
@@ -641,17 +626,17 @@ private:
 
     void               SetState(State aState);
     static const char *StateToString(State aState);
-#if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
-    static const char *CslStateToString(CslState aCslState);
-#endif
 
-    otRadioCaps        mRadioCaps;
-    State              mState;
-    uint8_t            mCsmaBackoffs;
-    uint8_t            mTransmitRetries;
-    ShortAddress       mShortAddress;
-    ExtAddress         mExtAddress;
-    bool               mRxOnWhenBackoff;
+    otRadioCaps  mRadioCaps;
+    State        mState;
+    uint8_t      mCsmaBackoffs;
+    uint8_t      mTransmitRetries;
+    ShortAddress mShortAddress;
+    ExtAddress   mExtAddress;
+    bool         mRxOnWhenBackoff : 1;
+#if OPENTHREAD_CONFIG_MAC_FILTER_ENABLE
+    bool mRadioFilterEnabled : 1;
+#endif
     int8_t             mEnergyScanMaxRssi;
     TimeMilli          mEnergyScanEndTime;
     TxFrame &          mTransmitFrame;
@@ -663,6 +648,9 @@ private:
     KeyMaterial        mNextKey;
     uint32_t           mFrameCounter;
     uint8_t            mKeyId;
+#if OPENTHREAD_CONFIG_MAC_ADD_DELAY_ON_NO_ACK_ERROR_BEFORE_RETRY
+    uint8_t mRetxDelayBackOffExponent;
+#endif
 #if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
     TimerMicro mTimer;
 #else
@@ -670,14 +658,15 @@ private:
 #endif
 
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
-    uint16_t   mCslPeriod;                 // The CSL sample period, in units of 10 symbols (160 microseconds).
-    uint8_t    mCslChannel : 7;            // The CSL sample channel (only when `mIsCslChannelSpecified` is `true`).
-    uint8_t    mIsCslChannelSpecified : 1; // Whether the CSL channel was explicitly set
-    TimeMicro  mCslSampleTime;             // The CSL sample time of the current period.
-    TimeMicro  mCslLastSync;               // The timestamp of the last successful CSL synchronization.
-    uint8_t    mCslParentAccuracy;         // Drift of timer used for scheduling CSL tx by the parent, in ± ppm.
-    uint8_t    mCslParentUncert;           // Uncertainty of the scheduling CSL of tx by the parent, in ±10 us units.
-    CslState   mCslState;
+    uint16_t mCslPeriod;      // The CSL sample period, in units of 10 symbols (160 microseconds).
+    uint8_t  mCslChannel : 7; // The CSL sample channel.
+    bool mIsCslSampling : 1;  // Indicates that the radio is receiving in CSL state for platforms not supporting delayed
+                              // reception.
+    uint16_t   mCslPeerShort; // The CSL peer short address.
+    TimeMicro  mCslSampleTime;     // The CSL sample time of the current period.
+    TimeMicro  mCslLastSync;       // The timestamp of the last successful CSL synchronization.
+    uint8_t    mCslParentAccuracy; // Drift of timer used for scheduling CSL tx by the parent, in ± ppm.
+    uint8_t    mCslParentUncert;   // Uncertainty of the scheduling CSL of tx by the parent, in ±10 us units.
     TimerMicro mCslTimer;
 #endif
 };

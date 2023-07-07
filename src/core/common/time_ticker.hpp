@@ -71,6 +71,7 @@ public:
         kIp6FragmentReassembler, ///< `Ip6::Ip6` (handling of fragmented messages)
         kDuaManager,             ///< `DuaManager`
         kMlrManager,             ///< `MlrManager`
+        kNetworkDataNotifier,    ///< `NetworkData::Notifier`
 
         kNumReceivers, ///< Number of receivers.
     };
@@ -109,8 +110,8 @@ public:
     bool IsReceiverRegistered(Receiver aReceiver) const { return (mReceivers & Mask(aReceiver)) != 0; }
 
 private:
-    static constexpr uint32_t kTickInterval  = 1000; // in msec.
-    static constexpr uint32_t kRestartJitter = 4;    // in msec, jitter added when restarting the timer [-4,+4] ms.
+    static constexpr uint32_t kTickInterval  = Time::kOneSecondInMsec;
+    static constexpr uint32_t kRestartJitter = 4; // in msec, jitter added when restarting the timer [-4,+4] ms.
 
     constexpr static uint32_t Mask(Receiver aReceiver) { return static_cast<uint32_t>(1U) << aReceiver; }
 
