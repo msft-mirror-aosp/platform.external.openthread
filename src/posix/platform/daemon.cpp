@@ -60,9 +60,10 @@ typedef char(Filename)[sizeof(sockaddr_un::sun_path)];
 
 void GetFilename(Filename &aFilename, const char *aPattern)
 {
-    int rval;
+    int         rval;
+    const char *netIfName = strlen(gNetifName) > 0 ? gNetifName : OPENTHREAD_POSIX_CONFIG_THREAD_NETIF_DEFAULT_NAME;
 
-    rval = snprintf(aFilename, sizeof(aFilename), aPattern, gNetifName);
+    rval = snprintf(aFilename, sizeof(aFilename), aPattern, netIfName);
     if (rval < 0 && static_cast<size_t>(rval) >= sizeof(aFilename))
     {
         DieNow(OT_EXIT_INVALID_ARGUMENTS);
@@ -70,6 +71,18 @@ void GetFilename(Filename &aFilename, const char *aPattern)
 }
 
 } // namespace
+
+int Daemon::OutputFormat(const char *aFormat, ...)
+{
+    int     ret;
+    va_list ap;
+
+    va_start(ap, aFormat);
+    ret = OutputFormatV(aFormat, ap);
+    va_end(ap);
+
+    return ret;
+}
 
 int Daemon::OutputFormatV(const char *aFormat, va_list aArguments)
 {
@@ -145,7 +158,7 @@ exit:
     }
     else
     {
-        otLogInfoPlat("Session socket is ready", strerror(errno));
+        otLogInfoPlat("Session socket is ready");
     }
 }
 
@@ -236,12 +249,14 @@ void Daemon::SetUp(void)
         DieNowWithMessage("listen", OT_EXIT_ERROR_ERRNO);
     }
 
+#if OPENTHREAD_POSIX_CONFIG_DAEMON_CLI_ENABLE
     otCliInit(
         gInstance,
         [](void *aContext, const char *aFormat, va_list aArguments) -> int {
             return static_cast<Daemon *>(aContext)->OutputFormatV(aFormat, aArguments);
         },
         this);
+#endif
 
     Mainloop::Manager::Get().Add(*this);
 
@@ -341,8 +356,11 @@ void Daemon::Process(const otSysMainloopContext &aContext)
         if (rval > 0)
         {
             buffer[rval] = '\0';
-            otLogInfoPlat("> %s", reinterpret_cast<const char *>(buffer));
+#if OPENTHREAD_POSIX_CONFIG_DAEMON_CLI_ENABLE
             otCliInputLine(reinterpret_cast<char *>(buffer));
+#else
+            OutputFormat("Error: CLI is disabled!\n");
+#endif
         }
         else
         {
