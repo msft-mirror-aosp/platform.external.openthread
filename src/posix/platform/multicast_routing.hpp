@@ -31,7 +31,7 @@
 
 #include "openthread-posix-config.h"
 
-#if OPENTHREAD_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
+#if OPENTHREAD_POSIX_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,7 +69,7 @@ private:
     {
         kMulticastForwardingCacheExpireTimeout    = 300, //< Expire timeout of Multicast Forwarding Cache (in seconds)
         kMulticastForwardingCacheExpiringInterval = 60,  //< Expire interval of Multicast Forwarding Cache (in seconds)
-        kMulitcastForwardingCacheTableSize =
+        kMulticastForwardingCacheTableSize =
             OPENTHREAD_POSIX_CONFIG_MAX_MULTICAST_FORWARDING_CACHE_TABLE, //< The max size of MFC table.
     };
 
@@ -126,13 +126,13 @@ private:
     void    RemoveMulticastForwardingCache(MulticastForwardingCache &aMfc) const;
     static const char *MifIndexToString(MifIndex aMif);
     void               DumpMulticastForwardingCache(void) const;
-    static void        HandleBackboneMulticastListenerEvent(void *                                 aContext,
+    static void        HandleBackboneMulticastListenerEvent(void                                  *aContext,
                                                             otBackboneRouterMulticastListenerEvent aEvent,
-                                                            const otIp6Address *                   aAddress);
+                                                            const otIp6Address                    *aAddress);
     void               HandleBackboneMulticastListenerEvent(otBackboneRouterMulticastListenerEvent aEvent,
-                                                            const Ip6::Address &                   aAddress);
+                                                            const Ip6::Address                    &aAddress);
 
-    MulticastForwardingCache mMulticastForwardingCacheTable[kMulitcastForwardingCacheTableSize];
+    MulticastForwardingCache mMulticastForwardingCacheTable[kMulticastForwardingCacheTableSize];
     uint64_t                 mLastExpireTime;
     int                      mMulticastRouterSock;
 };
@@ -140,6 +140,6 @@ private:
 } // namespace Posix
 } // namespace ot
 
-#endif // OPENTHREAD_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
+#endif // OPENTHREAD_POSIX_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
 
 #endif // OT_POSIX_PLATFORM_MULTICAST_ROUTING_HPP_
