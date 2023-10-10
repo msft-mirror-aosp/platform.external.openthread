@@ -134,6 +134,13 @@ Error Local::AddPrefix(const Ip6::Prefix &aPrefix, NetworkDataTlv::Type aSubTlvT
     DumpDebg("AddPrefix", GetBytes(), GetLength());
 
 exit:
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+    if (error == kErrorNoBufs)
+    {
+        Get<Notifier>().SignalNetworkDataFull();
+    }
+#endif
+
     return error;
 }
 
@@ -168,7 +175,6 @@ void Local::UpdateRloc(PrefixTlv &aPrefixTlv)
 
         default:
             OT_ASSERT(false);
-            OT_UNREACHABLE_CODE(break);
         }
     }
 }
@@ -179,11 +185,11 @@ void Local::UpdateRloc(PrefixTlv &aPrefixTlv)
 Error Local::AddService(uint32_t           aEnterpriseNumber,
                         const ServiceData &aServiceData,
                         bool               aServerStable,
-                        const ServerData & aServerData)
+                        const ServerData  &aServerData)
 {
     Error       error = kErrorNone;
     ServiceTlv *serviceTlv;
-    ServerTlv * serverTlv;
+    ServerTlv  *serverTlv;
     uint16_t    serviceTlvSize = ServiceTlv::CalculateSize(aEnterpriseNumber, aServiceData.GetLength()) +
                               sizeof(ServerTlv) + aServerData.GetLength();
 
@@ -212,6 +218,13 @@ Error Local::AddService(uint32_t           aEnterpriseNumber,
     DumpDebg("AddService", GetBytes(), GetLength());
 
 exit:
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+    if (error == kErrorNoBufs)
+    {
+        Get<Notifier>().SignalNetworkDataFull();
+    }
+#endif
+
     return error;
 }
 
@@ -243,7 +256,6 @@ void Local::UpdateRloc(ServiceTlv &aService)
 
         default:
             OT_ASSERT(false);
-            OT_UNREACHABLE_CODE(break);
         }
     }
 }
@@ -271,44 +283,8 @@ void Local::UpdateRloc(void)
 
         default:
             OT_ASSERT(false);
-            OT_UNREACHABLE_CODE(break);
         }
     }
-}
-
-bool Local::IsConsistent(void) const
-{
-    return Get<Leader>().ContainsEntriesFrom(*this, Get<Mle::MleRouter>().GetRloc16()) &&
-           ContainsEntriesFrom(Get<Leader>(), Get<Mle::MleRouter>().GetRloc16());
-}
-
-Error Local::UpdateInconsistentServerData(Coap::ResponseHandler aHandler, void *aContext)
-{
-    Error    error = kErrorNone;
-    uint16_t rloc  = Get<Mle::MleRouter>().GetRloc16();
-
-#if OPENTHREAD_FTD
-    // Don't send this Server Data Notification if the device is going to upgrade to Router
-    if (Get<Mle::MleRouter>().IsExpectedToBecomeRouterSoon())
-    {
-        ExitNow(error = kErrorInvalidState);
-    }
-#endif
-
-    UpdateRloc();
-
-    VerifyOrExit(!IsConsistent(), error = kErrorNotFound);
-
-    if (mOldRloc == rloc)
-    {
-        mOldRloc = Mac::kShortAddrInvalid;
-    }
-
-    SuccessOrExit(error = SendServerDataNotification(mOldRloc, /* aAppendNetDataTlv */ true, aHandler, aContext));
-    mOldRloc = rloc;
-
-exit:
-    return error;
 }
 
 } // namespace NetworkData

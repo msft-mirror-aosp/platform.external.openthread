@@ -46,10 +46,11 @@ void TestMessage(void)
         kLengthStep = 21,
     };
 
-    Instance *   instance;
+    Instance    *instance;
     MessagePool *messagePool;
-    Message *    message;
-    Message *    message2;
+    Message     *message;
+    Message     *message2;
+    Message     *messageCopy;
     uint8_t      writeBuffer[kMaxSize];
     uint8_t      readBuffer[kMaxSize];
     uint8_t      zeroBuffer[kMaxSize];
@@ -66,6 +67,12 @@ void TestMessage(void)
     Random::NonCrypto::FillBuffer(writeBuffer, kMaxSize);
 
     VerifyOrQuit((message = messagePool->Allocate(Message::kTypeIp6)) != nullptr);
+    message->SetLinkSecurityEnabled(Message::kWithLinkSecurity);
+    SuccessOrQuit(message->SetPriority(Message::Priority::kPriorityNet));
+    message->SetType(Message::Type::kType6lowpan);
+    message->SetSubType(Message::SubType::kSubTypeMleChildIdRequest);
+    message->SetLoopbackToHostAllowed(true);
+    message->SetOrigin(Message::kOriginHostUntrusted);
     SuccessOrQuit(message->SetLength(kMaxSize));
     message->WriteBytes(0, writeBuffer, kMaxSize);
     SuccessOrQuit(message->Read(0, readBuffer, kMaxSize));
@@ -73,6 +80,26 @@ void TestMessage(void)
     VerifyOrQuit(message->CompareBytes(0, readBuffer, kMaxSize));
     VerifyOrQuit(message->Compare(0, readBuffer));
     VerifyOrQuit(message->GetLength() == kMaxSize);
+
+    // Verify `Clone()` behavior
+    message->SetOffset(15);
+    messageCopy = message->Clone();
+    VerifyOrQuit(messageCopy->GetOffset() == message->GetOffset());
+    SuccessOrQuit(messageCopy->Read(0, readBuffer, kMaxSize));
+    VerifyOrQuit(memcmp(writeBuffer, readBuffer, kMaxSize) == 0);
+    VerifyOrQuit(messageCopy->CompareBytes(0, readBuffer, kMaxSize));
+    VerifyOrQuit(messageCopy->Compare(0, readBuffer));
+    VerifyOrQuit(messageCopy->GetLength() == kMaxSize);
+    VerifyOrQuit(messageCopy->GetType() == message->GetType());
+    VerifyOrQuit(messageCopy->GetSubType() == message->GetSubType());
+    VerifyOrQuit(messageCopy->IsLinkSecurityEnabled() == message->IsLinkSecurityEnabled());
+    VerifyOrQuit(messageCopy->GetPriority() == message->GetPriority());
+    VerifyOrQuit(messageCopy->IsLoopbackToHostAllowed() == message->IsLoopbackToHostAllowed());
+    VerifyOrQuit(messageCopy->GetOrigin() == message->GetOrigin());
+    VerifyOrQuit(messageCopy->Compare(0, readBuffer));
+    message->SetOffset(0);
+
+    messageCopy->Free();
 
     for (uint16_t offset = 0; offset < kMaxSize; offset++)
     {
@@ -134,63 +161,90 @@ void TestMessage(void)
 
     VerifyOrQuit(message->GetLength() == kMaxSize);
 
-    // Test `Message::CopyTo()` behavior.
+    // Test `WriteBytesFromMessage()` behavior copying between different
+    // messages.
 
     VerifyOrQuit((message2 = messagePool->Allocate(Message::kTypeIp6)) != nullptr);
     SuccessOrQuit(message2->SetLength(kMaxSize));
 
-    for (uint16_t srcOffset = 0; srcOffset < kMaxSize; srcOffset += kOffsetStep)
+    for (uint16_t readOffset = 0; readOffset < kMaxSize; readOffset += kOffsetStep)
     {
-        for (uint16_t dstOffset = 0; dstOffset < kMaxSize; dstOffset += kOffsetStep)
+        for (uint16_t writeOffset = 0; writeOffset < kMaxSize; writeOffset += kOffsetStep)
         {
-            for (uint16_t length = 0; length <= kMaxSize - dstOffset; length += kLengthStep)
+            for (uint16_t length = 0; length <= kMaxSize - Max(writeOffset, readOffset); length += kLengthStep)
             {
-                uint16_t bytesCopied;
-
                 message2->WriteBytes(0, zeroBuffer, kMaxSize);
 
-                bytesCopied = message->CopyTo(srcOffset, dstOffset, length, *message2);
-
-                if (srcOffset + length <= kMaxSize)
-                {
-                    VerifyOrQuit(bytesCopied == length, "CopyTo() failed");
-                }
-                else
-                {
-                    VerifyOrQuit(bytesCopied == kMaxSize - srcOffset, "CopyTo() failed");
-                }
+                message2->WriteBytesFromMessage(writeOffset, *message, readOffset, length);
 
                 SuccessOrQuit(message2->Read(0, readBuffer, kMaxSize));
 
-                VerifyOrQuit(memcmp(&readBuffer[0], zeroBuffer, dstOffset) == 0, "read before length");
-                VerifyOrQuit(memcmp(&readBuffer[dstOffset], &writeBuffer[srcOffset], bytesCopied) == 0);
-                VerifyOrQuit(
-                    memcmp(&readBuffer[dstOffset + bytesCopied], zeroBuffer, kMaxSize - bytesCopied - dstOffset) == 0,
-                    "read after length");
+                VerifyOrQuit(memcmp(&readBuffer[0], zeroBuffer, writeOffset) == 0);
+                VerifyOrQuit(memcmp(&readBuffer[writeOffset], &writeBuffer[readOffset], length) == 0);
+                VerifyOrQuit(memcmp(&readBuffer[writeOffset + length], zeroBuffer, kMaxSize - length - writeOffset) ==
+                             0);
 
-                VerifyOrQuit(message->CompareBytes(srcOffset, *message2, dstOffset, bytesCopied));
-                VerifyOrQuit(message2->CompareBytes(dstOffset, *message, srcOffset, bytesCopied));
+                VerifyOrQuit(message->CompareBytes(readOffset, *message2, writeOffset, length));
+                VerifyOrQuit(message2->CompareBytes(writeOffset, *message, readOffset, length));
             }
         }
     }
 
-    // Verify `CopyTo()` with same source and destination message and a backward copy.
+    // Verify `WriteBytesFromMessage()` behavior copying backwards within
+    // same message.
 
-    for (uint16_t srcOffset = 0; srcOffset < kMaxSize; srcOffset++)
+    for (uint16_t readOffset = 0; readOffset < kMaxSize; readOffset++)
     {
-        uint16_t bytesCopied;
+        uint16_t length = kMaxSize - readOffset;
 
         message->WriteBytes(0, writeBuffer, kMaxSize);
 
-        bytesCopied = message->CopyTo(srcOffset, 0, kMaxSize, *message);
-        VerifyOrQuit(bytesCopied == kMaxSize - srcOffset, "CopyTo() failed");
+        message->WriteBytesFromMessage(0, *message, readOffset, length);
 
         SuccessOrQuit(message->Read(0, readBuffer, kMaxSize));
 
-        VerifyOrQuit(memcmp(&readBuffer[0], &writeBuffer[srcOffset], bytesCopied) == 0,
-                     "CopyTo() changed before srcOffset");
-        VerifyOrQuit(memcmp(&readBuffer[bytesCopied], &writeBuffer[bytesCopied], kMaxSize - bytesCopied) == 0,
-                     "CopyTo() write error");
+        VerifyOrQuit(memcmp(&readBuffer[0], &writeBuffer[readOffset], length) == 0);
+        VerifyOrQuit(memcmp(&readBuffer[length], &writeBuffer[length], kMaxSize - length) == 0);
+    }
+
+    // Verify `WriteBytesFromMessage()` behavior copying forward within
+    // same message.
+
+    for (uint16_t writeOffset = 0; writeOffset < kMaxSize; writeOffset++)
+    {
+        uint16_t length = kMaxSize - writeOffset;
+
+        message->WriteBytes(0, writeBuffer, kMaxSize);
+
+        message->WriteBytesFromMessage(writeOffset, *message, 0, length);
+
+        SuccessOrQuit(message->Read(0, readBuffer, kMaxSize));
+
+        VerifyOrQuit(memcmp(&readBuffer[0], &writeBuffer[0], writeOffset) == 0);
+        VerifyOrQuit(memcmp(&readBuffer[writeOffset], &writeBuffer[0], length) == 0);
+    }
+
+    // Test `WriteBytesFromMessage()` behavior copying within same
+    // message at different read and write offsets and lengths.
+
+    for (uint16_t readOffset = 0; readOffset < kMaxSize; readOffset += kOffsetStep)
+    {
+        for (uint16_t writeOffset = 0; writeOffset < kMaxSize; writeOffset += kOffsetStep)
+        {
+            for (uint16_t length = 0; length <= kMaxSize - Max(writeOffset, readOffset); length += kLengthStep)
+            {
+                message->WriteBytes(0, writeBuffer, kMaxSize);
+
+                message->WriteBytesFromMessage(writeOffset, *message, readOffset, length);
+
+                SuccessOrQuit(message->Read(0, readBuffer, kMaxSize));
+
+                VerifyOrQuit(memcmp(&readBuffer[0], writeBuffer, writeOffset) == 0);
+                VerifyOrQuit(memcmp(&readBuffer[writeOffset], &writeBuffer[readOffset], length) == 0);
+                VerifyOrQuit(memcmp(&readBuffer[writeOffset + length], &writeBuffer[writeOffset + length],
+                                    kMaxSize - length - writeOffset) == 0);
+            }
+        }
     }
 
     // Verify `AppendBytesFromMessage()` with two different messages as source and destination.
@@ -236,6 +290,49 @@ void TestMessage(void)
     message->Free();
     message2->Free();
 
+    // Verify `RemoveHeader()`
+
+    for (uint16_t offset = 0; offset < kMaxSize; offset += kOffsetStep)
+    {
+        for (uint16_t length = 0; length <= kMaxSize - offset; length += kLengthStep)
+        {
+            VerifyOrQuit((message = messagePool->Allocate(Message::kTypeIp6)) != nullptr);
+            SuccessOrQuit(message->AppendBytes(writeBuffer, kMaxSize));
+
+            message->RemoveHeader(offset, length);
+
+            VerifyOrQuit(message->GetLength() == kMaxSize - length);
+
+            SuccessOrQuit(message->Read(0, readBuffer, kMaxSize - length));
+
+            VerifyOrQuit(memcmp(&readBuffer[0], &writeBuffer[0], offset) == 0);
+            VerifyOrQuit(memcmp(&readBuffer[offset], &writeBuffer[offset + length], kMaxSize - length - offset) == 0);
+            message->Free();
+        }
+    }
+
+    // Verify `InsertHeader()`
+
+    for (uint16_t offset = 0; offset < kMaxSize; offset += kOffsetStep)
+    {
+        for (uint16_t length = 0; length <= kMaxSize; length += kLengthStep)
+        {
+            VerifyOrQuit((message = messagePool->Allocate(Message::kTypeIp6)) != nullptr);
+            SuccessOrQuit(message->AppendBytes(writeBuffer, kMaxSize));
+
+            SuccessOrQuit(message->InsertHeader(offset, length));
+
+            VerifyOrQuit(message->GetLength() == kMaxSize + length);
+
+            SuccessOrQuit(message->Read(0, readBuffer, offset));
+            VerifyOrQuit(memcmp(&readBuffer[0], &writeBuffer[0], offset) == 0);
+
+            SuccessOrQuit(message->Read(offset + length, readBuffer, kMaxSize - offset));
+            VerifyOrQuit(memcmp(&readBuffer[0], &writeBuffer[offset], kMaxSize - offset) == 0);
+            message->Free();
+        }
+    }
+
     testFreeInstance(instance);
 }
 
@@ -246,8 +343,8 @@ void TestAppender(void)
 
     static constexpr uint16_t kMaxBufferSize = sizeof(kData1) * 2 + sizeof(kData2);
 
-    Instance *              instance;
-    Message *               message;
+    Instance               *instance;
+    Message                *message;
     uint8_t                 buffer[kMaxBufferSize];
     uint8_t                 zeroBuffer[kMaxBufferSize];
     Appender                bufAppender(buffer, sizeof(buffer));

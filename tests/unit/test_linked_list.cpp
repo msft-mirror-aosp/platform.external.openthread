@@ -88,8 +88,8 @@ constexpr Entry::Type kBetaType  = Entry::Type::kBeta;
 void VerifyLinkedListContent(const LinkedList<Entry> *aList, ...)
 {
     va_list      args;
-    Entry *      argEntry;
-    Entry *      argPrev = nullptr;
+    Entry       *argEntry;
+    Entry       *argPrev = nullptr;
     const Entry *prev;
     uint16_t     unusedId = 100;
 
@@ -134,7 +134,7 @@ void TestLinkedList(void)
 {
     Entry             a("a", 1, kAlphaType), b("b", 2, kAlphaType), c("c", 3, kBetaType);
     Entry             d("d", 4, kBetaType), e("e", 5, kAlphaType), f("f", 6, kBetaType);
-    Entry *           prev;
+    Entry            *prev;
     LinkedList<Entry> list;
     LinkedList<Entry> removedList;
 
@@ -294,6 +294,16 @@ void TestLinkedList(void)
     list.RemoveAllMatching(kBetaType, removedList);
     VerifyLinkedListContent(&list, &a, &b, &e, nullptr);
     VerifyLinkedListContent(&removedList, &f, &d, &c, nullptr);
+
+    list.Clear();
+    list.PushAfterTail(a);
+    VerifyLinkedListContent(&list, &a, nullptr);
+    list.PushAfterTail(b);
+    VerifyLinkedListContent(&list, &a, &b, nullptr);
+    list.PushAfterTail(c);
+    VerifyLinkedListContent(&list, &a, &b, &c, nullptr);
+    list.PushAfterTail(d);
+    VerifyLinkedListContent(&list, &a, &b, &c, &d, nullptr);
 }
 
 void TestOwningList(void)

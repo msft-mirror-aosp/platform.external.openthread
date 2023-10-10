@@ -93,7 +93,7 @@
 #endif // OPENTHREAD_CONFIG_ASSERT_ENABLE
 
 /**
- * This macro checks a given status (which is expected to be successful) against zero (0) which indicates success,
+ * Checks a given status (which is expected to be successful) against zero (0) which indicates success,
  * and `OT_ASSERT()` if it is not.
  *
  * @param[in]  aStatus     A scalar status to be evaluated against zero (0).
@@ -107,5 +107,20 @@
             OT_ASSERT(false);    \
         }                        \
     } while (false)
+
+/**
+ * @def AssertPointerIsNotNull
+ *
+ * Asserts that a given pointer (API input parameter) is not `nullptr`. This macro checks the pointer only
+ * when `OPENTHREAD_CONFIG_ASSERT_CHECK_API_POINTER_PARAM_FOR_NULL` is enabled. Otherwise it is an empty macro.
+ *
+ * @param[in]  aPointer   The pointer variable (API input parameter) to check.
+ *
+ */
+#if OPENTHREAD_CONFIG_ASSERT_CHECK_API_POINTER_PARAM_FOR_NULL
+#define AssertPointerIsNotNull(aPointer) OT_ASSERT((aPointer) != nullptr)
+#else
+#define AssertPointerIsNotNull(aPointer)
+#endif
 
 #endif // DEBUG_HPP_

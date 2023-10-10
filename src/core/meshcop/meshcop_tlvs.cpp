@@ -35,6 +35,7 @@
 
 #include "common/const_cast.hpp"
 #include "common/debug.hpp"
+#include "common/num_utils.hpp"
 #include "common/string.hpp"
 #include "meshcop/meshcop.hpp"
 
@@ -135,10 +136,7 @@ void NetworkNameTlv::SetNetworkName(const NameData &aNameData)
     SetLength(len);
 }
 
-bool NetworkNameTlv::IsValid(void) const
-{
-    return GetLength() >= 1 && IsValidUtf8String(mNetworkName, GetLength());
-}
+bool NetworkNameTlv::IsValid(void) const { return IsValidUtf8String(mNetworkName, GetLength()); }
 
 void SteeringDataTlv::CopyTo(SteeringData &aSteeringData) const
 {
@@ -154,7 +152,7 @@ bool SecurityPolicyTlv::IsValid(void) const
 SecurityPolicy SecurityPolicyTlv::GetSecurityPolicy(void) const
 {
     SecurityPolicy securityPolicy;
-    uint8_t        length = OT_MIN(static_cast<uint8_t>(sizeof(mFlags)), GetFlagsLength());
+    uint8_t        length = Min(static_cast<uint8_t>(sizeof(mFlags)), GetFlagsLength());
 
     securityPolicy.mRotationTime = GetRotationTime();
     securityPolicy.SetFlags(mFlags, length);
@@ -213,6 +211,20 @@ void ChannelTlv::SetChannel(uint16_t aChannel)
     mChannel = HostSwap16(aChannel);
 }
 
+const char *StateTlv::StateToString(State aState)
+{
+    static const char *const kStateStrings[] = {
+        "Pending", // (0) kPending,
+        "Accept",  // (1) kAccept
+        "Reject",  // (2) kReject,
+    };
+
+    static_assert(0 == kPending, "kPending value is incorrect");
+    static_assert(1 == kAccept, "kAccept value is incorrect");
+
+    return aState == kReject ? kStateStrings[2] : kStateStrings[aState];
+}
+
 bool ChannelMaskBaseTlv::IsValid(void) const
 {
     const ChannelMaskEntryBase *cur = GetFirstEntry();
@@ -260,10 +272,7 @@ exit:
     return entry;
 }
 
-ChannelMaskEntryBase *ChannelMaskBaseTlv::GetFirstEntry(void)
-{
-    return AsNonConst(AsConst(this)->GetFirstEntry());
-}
+ChannelMaskEntryBase *ChannelMaskBaseTlv::GetFirstEntry(void) { return AsNonConst(AsConst(this)->GetFirstEntry()); }
 
 void ChannelMaskTlv::SetChannelMask(uint32_t aChannelMask)
 {
@@ -364,8 +373,7 @@ uint32_t ChannelMaskTlv::GetChannelMask(const Message &aMessage)
     uint16_t offset;
     uint16_t end;
 
-    SuccessOrExit(FindTlvValueOffset(aMessage, kChannelMask, offset, end));
-    end += offset;
+    SuccessOrExit(FindTlvValueStartEndOffsets(aMessage, kChannelMask, offset, end));
 
     while (offset + sizeof(ChannelMaskEntryBase) <= end)
     {

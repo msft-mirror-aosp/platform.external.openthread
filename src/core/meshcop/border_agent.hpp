@@ -40,12 +40,14 @@
 
 #include <openthread/border_agent.h>
 
-#include "coap/coap.hpp"
 #include "common/as_core_type.hpp"
+#include "common/heap_allocatable.hpp"
 #include "common/locator.hpp"
 #include "common/non_copyable.hpp"
 #include "common/notifier.hpp"
 #include "net/udp6.hpp"
+#include "thread/tmf.hpp"
+#include "thread/uri_paths.hpp"
 
 namespace ot {
 
@@ -54,10 +56,14 @@ namespace MeshCoP {
 class BorderAgent : public InstanceLocator, private NonCopyable
 {
     friend class ot::Notifier;
+    friend class Tmf::Agent;
+    friend class Tmf::SecureAgent;
 
 public:
+    typedef otBorderAgentId Id; ///< Border Agent ID.
+
     /**
-     * This enumeration defines the Border Agent state.
+     * Defines the Border Agent state.
      *
      */
     enum State : uint8_t
@@ -68,15 +74,47 @@ public:
     };
 
     /**
-     * This constructor initializes the `BorderAgent` object.
+     * Initializes the `BorderAgent` object.
      *
      * @param[in]  aInstance     A reference to the OpenThread instance.
      *
      */
     explicit BorderAgent(Instance &aInstance);
 
+#if OPENTHREAD_CONFIG_BORDER_AGENT_ID_ENABLE
     /**
-     * This method gets the UDP port of this service.
+     * Gets the randomly generated Border Agent ID.
+     *
+     * The ID is saved in persistent storage and survives reboots. The typical use case of the ID is to
+     * be published in the MeshCoP mDNS service as the `id` TXT value for the client to identify this
+     * Border Router/Agent device.
+     *
+     * @param[out] aId  Reference to return the Border Agent ID.
+     *
+     * @retval kErrorNone  If successfully retrieved the Border Agent ID.
+     * @retval ...         If failed to retrieve the Border Agent ID.
+     *
+     */
+    Error GetId(Id &aId);
+
+    /**
+     * Sets the Border Agent ID.
+     *
+     * The Border Agent ID will be saved in persistent storage and survive reboots. It's required
+     * to set the ID only once after factory reset. If the ID has never been set by calling this
+     * method, a random ID will be generated and returned when `GetId()` is called.
+     *
+     * @param[out] aId  specifies the Border Agent ID.
+     *
+     * @retval kErrorNone  If successfully set the Border Agent ID.
+     * @retval ...         If failed to set the Border Agent ID.
+     *
+     */
+    Error SetId(const Id &aId);
+#endif
+
+    /**
+     * Gets the UDP port of this service.
      *
      * @returns  UDP port number.
      *
@@ -84,19 +122,19 @@ public:
     uint16_t GetUdpPort(void) const;
 
     /**
-     * This method starts the Border Agent service.
+     * Starts the Border Agent service.
      *
      */
     void Start(void);
 
     /**
-     * This method stops the Border Agent service.
+     * Stops the Border Agent service.
      *
      */
     void Stop(void);
 
     /**
-     * This method gets the state of the Border Agent service.
+     * Gets the state of the Border Agent service.
      *
      * @returns The state of the Border Agent service.
      *
@@ -104,13 +142,13 @@ public:
     State GetState(void) const { return mState; }
 
     /**
-     * This method applies the Mesh Local Prefix.
+     * Applies the Mesh Local Prefix.
      *
      */
     void ApplyMeshLocalPrefix(void);
 
     /**
-     * This method returns the UDP Proxy port to which the commissioner is currently
+     * Returns the UDP Proxy port to which the commissioner is currently
      * bound.
      *
      * @returns  The current UDP Proxy port or 0 if no Proxy Transmit has been received yet.
@@ -119,13 +157,16 @@ public:
     uint16_t GetUdpProxyPort(void) const { return mUdpProxyPort; }
 
 private:
-    class ForwardContext : public InstanceLocatorInit
+    static constexpr uint16_t kUdpPort          = OPENTHREAD_CONFIG_BORDER_AGENT_UDP_PORT;
+    static constexpr uint32_t kKeepAliveTimeout = 50 * 1000; // Timeout to reject a commissioner (in msec)
+
+    class ForwardContext : public InstanceLocatorInit, public Heap::Allocatable<ForwardContext>
     {
     public:
-        void     Init(Instance &aInstance, const Coap::Message &aMessage, bool aPetition, bool aSeparate);
+        Error    Init(Instance &aInstance, const Coap::Message &aMessage, bool aPetition, bool aSeparate);
         bool     IsPetition(void) const { return mPetition; }
         uint16_t GetMessageId(void) const { return mMessageId; }
-        Error    ToHeader(Coap::Message &aMessage, uint8_t aCode);
+        Error    ToHeader(Coap::Message &aMessage, uint8_t aCode) const;
 
     private:
         uint16_t mMessageId;                             // The CoAP Message ID of the original request.
@@ -139,67 +180,62 @@ private:
     void HandleNotifierEvents(Events aEvents);
 
     Coap::Message::Code CoapCodeFromError(Error aError);
-    void                SendErrorMessage(ForwardContext &aForwardContext, Error aError);
+    Error               SendMessage(Coap::Message &aMessage);
+    void                SendErrorMessage(const ForwardContext &aForwardContext, Error aError);
     void                SendErrorMessage(const Coap::Message &aRequest, bool aSeparate, Error aError);
 
     static void HandleConnected(bool aConnected, void *aContext);
     void        HandleConnected(bool aConnected);
 
-    template <Coap::Resource BorderAgent::*aResource>
-    static void HandleRequest(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
+    template <Uri kUri> void HandleTmf(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
-    static void HandleTimeout(Timer &aTimer);
-    void        HandleTimeout(void);
+    void HandleTimeout(void);
 
-    static void HandleCoapResponse(void *               aContext,
-                                   otMessage *          aMessage,
+    static void HandleCoapResponse(void                *aContext,
+                                   otMessage           *aMessage,
                                    const otMessageInfo *aMessageInfo,
                                    Error                aResult);
-    void        HandleCoapResponse(ForwardContext &aForwardContext, const Coap::Message *aResponse, Error aResult);
+    void  HandleCoapResponse(const ForwardContext &aForwardContext, const Coap::Message *aResponse, Error aResult);
+    Error ForwardToLeader(const Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo, Uri aUri);
+    Error ForwardToCommissioner(Coap::Message &aForwardMessage, const Message &aMessage);
+    static bool HandleUdpReceive(void *aContext, const otMessage *aMessage, const otMessageInfo *aMessageInfo);
+    bool        HandleUdpReceive(const Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
-    Error       ForwardToLeader(const Coap::Message &   aMessage,
-                                const Ip6::MessageInfo &aMessageInfo,
-                                const char *            aPath,
-                                bool                    aPetition,
-                                bool                    aSeparate);
-    Error       ForwardToCommissioner(Coap::Message &aForwardMessage, const Message &aMessage);
-    void        HandleKeepAlive(const Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
-    void        HandleRelayTransmit(const Coap::Message &aMessage);
-    void        HandleRelayReceive(const Coap::Message &aMessage);
-    void        HandleProxyTransmit(const Coap::Message &aMessage);
-    static bool HandleUdpReceive(void *aContext, const otMessage *aMessage, const otMessageInfo *aMessageInfo)
-    {
-        return static_cast<BorderAgent *>(aContext)->HandleUdpReceive(AsCoreType(aMessage), AsCoreType(aMessageInfo));
-    }
-    bool HandleUdpReceive(const Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+#if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_WARN)
+    void LogError(const char *aActionText, Error aError);
+#else
+    void LogError(const char *, Error) {}
+#endif
 
-    static constexpr uint32_t kKeepAliveTimeout = 50 * 1000; // Timeout to reject a commissioner.
+    using TimeoutTimer = TimerMilliIn<BorderAgent, &BorderAgent::HandleTimeout>;
 
-    Ip6::MessageInfo mMessageInfo;
-
-    Coap::Resource mCommissionerPetition;
-    Coap::Resource mCommissionerKeepAlive;
-    Coap::Resource mRelayTransmit;
-    Coap::Resource mRelayReceive;
-    Coap::Resource mCommissionerGet;
-    Coap::Resource mCommissionerSet;
-    Coap::Resource mActiveGet;
-    Coap::Resource mActiveSet;
-    Coap::Resource mPendingGet;
-    Coap::Resource mPendingSet;
-    Coap::Resource mProxyTransmit;
-
-    Ip6::Udp::Receiver         mUdpReceiver; ///< The UDP receiver to receive packets from external commissioner
+    State                      mState;
+    uint16_t                   mUdpProxyPort;
+    Ip6::Udp::Receiver         mUdpReceiver;
     Ip6::Netif::UnicastAddress mCommissionerAloc;
-
-    TimerMilli mTimer;
-    State      mState;
-    uint16_t   mUdpProxyPort;
+    TimeoutTimer               mTimer;
+#if OPENTHREAD_CONFIG_BORDER_AGENT_ID_ENABLE
+    Id   mId;
+    bool mIdInitialized;
+#endif
 };
+
+DeclareTmfHandler(BorderAgent, kUriRelayRx);
+DeclareTmfHandler(BorderAgent, kUriCommissionerPetition);
+DeclareTmfHandler(BorderAgent, kUriCommissionerKeepAlive);
+DeclareTmfHandler(BorderAgent, kUriRelayTx);
+DeclareTmfHandler(BorderAgent, kUriCommissionerGet);
+DeclareTmfHandler(BorderAgent, kUriCommissionerSet);
+DeclareTmfHandler(BorderAgent, kUriActiveGet);
+DeclareTmfHandler(BorderAgent, kUriActiveSet);
+DeclareTmfHandler(BorderAgent, kUriPendingGet);
+DeclareTmfHandler(BorderAgent, kUriPendingSet);
+DeclareTmfHandler(BorderAgent, kUriProxyTx);
 
 } // namespace MeshCoP
 
 DefineMapEnum(otBorderAgentState, MeshCoP::BorderAgent::State);
+DefineCoreType(otBorderAgentId, MeshCoP::BorderAgent::Id);
 
 } // namespace ot
 

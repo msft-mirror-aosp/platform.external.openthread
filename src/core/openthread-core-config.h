@@ -41,8 +41,18 @@
 #define OT_THREAD_VERSION_1_1 2
 #define OT_THREAD_VERSION_1_2 3
 #define OT_THREAD_VERSION_1_3 4
+#define OT_THREAD_VERSION_1_3_1 5
 
 #define OPENTHREAD_CORE_CONFIG_H_IN
+
+/**
+ * Include project and platform specific header files in the following order:
+ *
+ * 1. Project specific header file (`OPENTHREAD_PROJECT_CORE_CONFIG_FILE`)
+ * 2. Platform specific header file (`OPENTHREAD_PLATFORM_CORE_CONFIG_FILE`)
+ * 3. Default config values as specified by `config/{module}.h`
+ *
+ */
 
 #ifdef OPENTHREAD_PROJECT_CORE_CONFIG_FILE
 #include OPENTHREAD_PROJECT_CORE_CONFIG_FILE
@@ -52,13 +62,19 @@
 #include "openthread-core-user-config.h"
 #endif
 
+#ifdef OPENTHREAD_PLATFORM_CORE_CONFIG_FILE
+#include OPENTHREAD_PLATFORM_CORE_CONFIG_FILE
+#endif
+
 #ifndef OPENTHREAD_CONFIG_THREAD_VERSION
 #define OPENTHREAD_CONFIG_THREAD_VERSION OT_THREAD_VERSION_1_3
 #endif
 
 #include "config/announce_sender.h"
 #include "config/backbone_router.h"
+#include "config/border_agent.h"
 #include "config/border_router.h"
+#include "config/border_routing.h"
 #include "config/channel_manager.h"
 #include "config/channel_monitor.h"
 #include "config/child_supervision.h"
@@ -76,16 +92,22 @@
 #include "config/history_tracker.h"
 #include "config/ip6.h"
 #include "config/joiner.h"
+#include "config/link_metrics_manager.h"
 #include "config/link_quality.h"
 #include "config/link_raw.h"
 #include "config/logging.h"
 #include "config/mac.h"
+#include "config/mesh_diag.h"
+#include "config/mesh_forwarder.h"
 #include "config/misc.h"
 #include "config/mle.h"
+#include "config/nat64.h"
 #include "config/netdata_publisher.h"
+#include "config/network_diagnostic.h"
 #include "config/parent_search.h"
 #include "config/ping_sender.h"
 #include "config/platform.h"
+#include "config/power_calibration.h"
 #include "config/radio_link.h"
 #include "config/sntp_client.h"
 #include "config/srp_client.h"

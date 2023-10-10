@@ -37,6 +37,7 @@
 #include "common/instance.hpp"
 #include "common/locator_getters.hpp"
 #include "common/log.hpp"
+#include "common/num_utils.hpp"
 #include "common/random.hpp"
 
 /**
@@ -80,9 +81,9 @@ extern "C" void otPlatDsoHandleDisconnected(otPlatDsoConnection *aConnection, ot
 //---------------------------------------------------------------------------------------------------------------------
 // Dso::Connection
 
-Dso::Connection::Connection(Instance &           aInstance,
+Dso::Connection::Connection(Instance            &aInstance,
                             const Ip6::SockAddr &aPeerSockAddr,
-                            Callbacks &          aCallbacks,
+                            Callbacks           &aCallbacks,
                             uint32_t             aInactivityTimeout,
                             uint32_t             aKeepAliveInterval)
     : InstanceLocator(aInstance)
@@ -321,7 +322,7 @@ exit:
 Error Dso::Connection::SendRetryDelayMessage(uint32_t aDelay, Dns::Header::Response aResponseCode)
 {
     Error         error   = kErrorNone;
-    Message *     message = nullptr;
+    Message      *message = nullptr;
     RetryDelayTlv retryDelayTlv;
     MessageId     messageId;
 
@@ -411,7 +412,7 @@ Error Dso::Connection::SendKeepAliveMessage(MessageType aMessageType, MessageId 
     // `kResponseMessage`.
 
     Error        error   = kErrorNone;
-    Message *    message = nullptr;
+    Message     *message = nullptr;
     KeepAliveTlv keepAliveTlv;
 
     switch (mState)
@@ -479,9 +480,9 @@ exit:
     return error;
 }
 
-Error Dso::Connection::SendMessage(Message &             aMessage,
+Error Dso::Connection::SendMessage(Message              &aMessage,
                                    MessageType           aMessageType,
-                                   MessageId &           aMessageId,
+                                   MessageId            &aMessageId,
                                    Dns::Header::Response aResponseCode,
                                    uint32_t              aResponseTimeout)
 {
@@ -787,7 +788,7 @@ exit:
 }
 
 Error Dso::Connection::ProcessRequestOrUnidirectionalMessage(const Dns::Header &aHeader,
-                                                             const Message &    aMessage,
+                                                             const Message     &aMessage,
                                                              Tlv::Type          aPrimaryTlvType)
 {
     Error error = kErrorAbort;
@@ -846,7 +847,7 @@ Error Dso::Connection::ProcessRequestOrUnidirectionalMessage(const Dns::Header &
 }
 
 Error Dso::Connection::ProcessResponseMessage(const Dns::Header &aHeader,
-                                              const Message &    aMessage,
+                                              const Message     &aMessage,
                                               Tlv::Type          aPrimaryTlvType)
 {
     Error     error = kErrorAbort;
@@ -990,7 +991,8 @@ Error Dso::Connection::ProcessKeepAliveMessage(const Dns::Header &aHeader, const
     AdjustInactivityTimeout(keepAliveTlv.GetInactivityTimeout());
     mKeepAlive.SetInterval(keepAliveTlv.GetKeepAliveInterval());
 
-    LogInfo("Timeouts Inactivity:%u, KeepAlive:%u", mInactivity.GetInterval(), mKeepAlive.GetInterval());
+    LogInfo("Timeouts Inactivity:%lu, KeepAlive:%lu", ToUlong(mInactivity.GetInterval()),
+            ToUlong(mKeepAlive.GetInterval()));
 
     error = kErrorNone;
 
@@ -1019,7 +1021,7 @@ Error Dso::Connection::ProcessRetryDelayMessage(const Dns::Header &aHeader, cons
     mRetryDelay          = retryDelayTlv.GetRetryDelay();
 
     LogInfo("Received Retry Delay message from server %s", mPeerSockAddr.ToString().AsCString());
-    LogInfo("   RetryDelay:%u ms, ResponseCode:%d", mRetryDelay, mRetryDelayErrorCode);
+    LogInfo("   RetryDelay:%lu ms, ResponseCode:%d", ToUlong(mRetryDelay), mRetryDelayErrorCode);
 
     Disconnect(kGracefullyClose, kReasonServerRetryDelayRequest);
 
@@ -1029,7 +1031,7 @@ exit:
 
 void Dso::Connection::SendErrorResponse(const Dns::Header &aHeader, Dns::Header::Response aResponseCode)
 {
-    Message *   response = NewMessage();
+    Message    *response = NewMessage();
     Dns::Header header;
 
     VerifyOrExit(response != nullptr);
@@ -1125,7 +1127,7 @@ void Dso::Connection::AdjustInactivityTimeout(uint32_t aNewTimeout)
             // five seconds or one quarter of the new inactivity
             // timeout, whichever is greater [RFC 8490 - 7.1.1].
 
-            newExpiration = now + OT_MAX(kMinServerInactivityWaitTime, aNewTimeout / 4);
+            newExpiration = now + Max(kMinServerInactivityWaitTime, aNewTimeout / 4);
         }
     }
 
@@ -1143,7 +1145,7 @@ uint32_t Dso::Connection::CalculateServerInactivityWaitTime(void) const
 
     OT_ASSERT(mInactivity.IsUsed());
 
-    return OT_MAX(mInactivity.GetInterval() * 2, kMinServerInactivityWaitTime);
+    return Max(mInactivity.GetInterval() * 2, kMinServerInactivityWaitTime);
 }
 
 void Dso::Connection::ResetTimeouts(bool aIsKeepAliveMessage)
@@ -1219,12 +1221,12 @@ TimeMilli Dso::Connection::GetNextFireTime(TimeMilli aNow) const
     case kStateConnectedButSessionless:
     case kStateEstablishingSession:
     case kStateSessionEstablished:
-        nextTime = OT_MIN(nextTime, mPendingRequests.GetNextFireTime(aNow));
+        nextTime = Min(nextTime, mPendingRequests.GetNextFireTime(aNow));
 
         if (mKeepAlive.IsUsed())
         {
             VerifyOrExit(mKeepAlive.GetExpirationTime() > aNow, nextTime = aNow);
-            nextTime = OT_MIN(nextTime, mKeepAlive.GetExpirationTime());
+            nextTime = Min(nextTime, mKeepAlive.GetExpirationTime());
         }
 
         if (mInactivity.IsUsed() && mPendingRequests.IsEmpty() && !mLongLivedOperation)
@@ -1234,7 +1236,7 @@ TimeMilli Dso::Connection::GetNextFireTime(TimeMilli aNow) const
             // active long-lived operation.
 
             VerifyOrExit(mInactivity.GetExpirationTime() > aNow, nextTime = aNow);
-            nextTime = OT_MIN(nextTime, mInactivity.GetExpirationTime());
+            nextTime = Min(nextTime, mInactivity.GetExpirationTime());
         }
 
         break;
@@ -1311,7 +1313,7 @@ void Dso::Connection::HandleTimer(TimeMilli aNow, TimeMilli &aNextTime)
     }
 
 exit:
-    aNextTime = OT_MIN(aNextTime, GetNextFireTime(aNow));
+    aNextTime = Min(aNextTime, GetNextFireTime(aNow));
     SignalAnyStateChange();
 }
 
@@ -1407,10 +1409,7 @@ exit:
     return error;
 }
 
-void Dso::Connection::PendingRequests::Remove(MessageId aMessageId)
-{
-    mRequests.RemoveMatching(aMessageId);
-}
+void Dso::Connection::PendingRequests::Remove(MessageId aMessageId) { mRequests.RemoveMatching(aMessageId); }
 
 bool Dso::Connection::PendingRequests::HasAnyTimedOut(TimeMilli aNow) const
 {
@@ -1435,7 +1434,7 @@ TimeMilli Dso::Connection::PendingRequests::GetNextFireTime(TimeMilli aNow) cons
     for (const Entry &entry : mRequests)
     {
         VerifyOrExit(entry.mTimeout > aNow, nextTime = aNow);
-        nextTime = OT_MIN(entry.mTimeout, nextTime);
+        nextTime = Min(entry.mTimeout, nextTime);
     }
 
 exit:
@@ -1448,7 +1447,7 @@ exit:
 Dso::Dso(Instance &aInstance)
     : InstanceLocator(aInstance)
     , mAcceptHandler(nullptr)
-    , mTimer(aInstance, HandleTimer)
+    , mTimer(aInstance)
 {
 }
 
@@ -1458,10 +1457,7 @@ void Dso::StartListening(AcceptHandler aAcceptHandler)
     otPlatDsoEnableListening(&GetInstance(), true);
 }
 
-void Dso::StopListening(void)
-{
-    otPlatDsoEnableListening(&GetInstance(), false);
-}
+void Dso::StopListening(void) { otPlatDsoEnableListening(&GetInstance(), false); }
 
 Dso::Connection *Dso::FindClientConnection(const Ip6::SockAddr &aPeerSockAddr)
 {
@@ -1485,11 +1481,6 @@ Dso::Connection *Dso::AcceptConnection(const Ip6::SockAddr &aPeerSockAddr)
 
 exit:
     return connection;
-}
-
-void Dso::HandleTimer(Timer &aTimer)
-{
-    aTimer.Get<Dso>().HandleTimer();
 }
 
 void Dso::HandleTimer(void)
@@ -1519,5 +1510,33 @@ void Dso::HandleTimer(void)
 
 } // namespace Dns
 } // namespace ot
+
+#if OPENTHREAD_CONFIG_DNS_DSO_MOCK_PLAT_APIS_ENABLE
+
+OT_TOOL_WEAK void otPlatDsoEnableListening(otInstance *aInstance, bool aEnable)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+    OT_UNUSED_VARIABLE(aEnable);
+}
+
+OT_TOOL_WEAK void otPlatDsoConnect(otPlatDsoConnection *aConnection, const otSockAddr *aPeerSockAddr)
+{
+    OT_UNUSED_VARIABLE(aConnection);
+    OT_UNUSED_VARIABLE(aPeerSockAddr);
+}
+
+OT_TOOL_WEAK void otPlatDsoSend(otPlatDsoConnection *aConnection, otMessage *aMessage)
+{
+    OT_UNUSED_VARIABLE(aConnection);
+    OT_UNUSED_VARIABLE(aMessage);
+}
+
+OT_TOOL_WEAK void otPlatDsoDisconnect(otPlatDsoConnection *aConnection, otPlatDsoDisconnectMode aMode)
+{
+    OT_UNUSED_VARIABLE(aConnection);
+    OT_UNUSED_VARIABLE(aMode);
+}
+
+#endif // OPENTHREAD_CONFIG_DNS_DSO_MOCK_PLAT_APIS_ENABLE
 
 #endif // OPENTHREAD_CONFIG_DNS_DSO_ENABLE
