@@ -121,6 +121,13 @@ static const char *getTrelRadioUrl(otPlatformConfig *aPlatformConfig)
 }
 #endif
 
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
+void otSysSetInfraNetif(const char *aInfraNetifName, int aIcmp6Socket)
+{
+    ot::Posix::InfraNetif::Get().SetInfraNetif(aInfraNetifName, aIcmp6Socket);
+}
+#endif
+
 void platformInit(otPlatformConfig *aPlatformConfig)
 {
 #if OPENTHREAD_POSIX_CONFIG_BACKTRACE_ENABLE
@@ -143,17 +150,11 @@ void platformInit(otPlatformConfig *aPlatformConfig)
 #endif
 
 #if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
-    ot::Posix::InfraNetif::Get().Init(aPlatformConfig->mBackboneInterfaceName);
+    ot::Posix::InfraNetif::Get().Init();
+
 #endif
 
     gNetifName[0] = '\0';
-
-#if OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE
-    if (otIp4CidrFromString(OPENTHREAD_POSIX_CONFIG_NAT64_CIDR, &gNat64Cidr) != OT_ERROR_NONE)
-    {
-        gNat64Cidr.mLength = 0;
-    }
-#endif
 
 #if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
     platformNetifInit(aPlatformConfig);
@@ -171,8 +172,10 @@ exit:
     return;
 }
 
-void platformSetUp(void)
+void platformSetUp(otPlatformConfig *aPlatformConfig)
 {
+    OT_UNUSED_VARIABLE(aPlatformConfig);
+
     VerifyOrExit(!gDryRun);
 
 #if OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
@@ -180,6 +183,11 @@ void platformSetUp(void)
 #endif
 
 #if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
+    if (aPlatformConfig->mBackboneInterfaceName != nullptr && strlen(aPlatformConfig->mBackboneInterfaceName) > 0)
+    {
+        otSysSetInfraNetif(aPlatformConfig->mBackboneInterfaceName,
+                           ot::Posix::InfraNetif::CreateIcmp6Socket(aPlatformConfig->mBackboneInterfaceName));
+    }
     ot::Posix::InfraNetif::Get().SetUp();
 #endif
 
@@ -213,7 +221,7 @@ otInstance *otSysInit(otPlatformConfig *aPlatformConfig)
     gInstance = otInstanceInitSingle();
     OT_ASSERT(gInstance != nullptr);
 
-    platformSetUp();
+    platformSetUp(aPlatformConfig);
 
     return gInstance;
 }
@@ -290,7 +298,7 @@ void otSysDeinit(void)
 
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
 /**
- * This function try selecting the given file descriptors in nonblocking mode.
+ * Try selecting the given file descriptors in nonblocking mode.
  *
  * @param[in,out]  aContext  A reference to the mainloop context.
  *
