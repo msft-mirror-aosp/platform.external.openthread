@@ -45,23 +45,19 @@ namespace ot {
 namespace Posix {
 
 /**
- * This class defines a vendor interface to the Radio Co-processor (RCP).
+ * Defines a vendor interface to the Radio Co-processor (RCP).
  *
  */
 class VendorInterface : public ot::Spinel::SpinelInterface
 {
 public:
     /**
-     * This constructor initializes the object.
+     * Initializes the object.
      *
-     * @param[in] aCallback         A reference to a `Callback` object.
-     * @param[in] aCallbackContext  The context pointer passed to the callback.
-     * @param[in] aFrameBuffer      A reference to a `RxFrameBuffer` object.
+     * @param[in] aRadioUrl  RadioUrl parsed from radio url.
      *
      */
-    VendorInterface(Spinel::SpinelInterface::ReceiveFrameCallback aCallback,
-                    void                                         *aCallbackContext,
-                    Spinel::SpinelInterface::RxFrameBuffer       &aFrameBuffer);
+    VendorInterface(const Url::Url &aRadioUrl);
 
     /**
      * This destructor deinitializes the object.
@@ -70,27 +66,29 @@ public:
     ~VendorInterface(void);
 
     /**
-     * This method initializes the interface to the Radio Co-processor (RCP).
+     * Initializes the interface to the Radio Co-processor (RCP).
      *
      * @note This method should be called before reading and sending spinel frames to the interface.
      *
-     * @param[in] aRadioUrl  Arguments parsed from radio url.
+     * @param[in] aCallback         Callback on frame received
+     * @param[in] aCallbackContext  Callback context
+     * @param[in] aFrameBuffer      A reference to a `RxFrameBuffer` object.
      *
-     * @retval OT_ERROR_NONE          The interface is initialized successfully.
-     * @retval OT_ERROR_ALREADY       The interface is already initialized.
-     * @retval OT_ERROR_INVALID_ARGS  The UART device or executable cannot be found or failed to open/run.
+     * @retval OT_ERROR_NONE       The interface is initialized successfully
+     * @retval OT_ERROR_ALREADY    The interface is already initialized.
+     * @retval OT_ERROR_FAILED     Failed to initialize the interface.
      *
      */
-    otError Init(const Url::Url &aRadioUrl);
+    otError Init(ReceiveFrameCallback aCallback, void *aCallbackContext, RxFrameBuffer &aFrameBuffer);
 
     /**
-     * This method deinitializes the interface to the RCP.
+     * Deinitializes the interface to the RCP.
      *
      */
     void Deinit(void);
 
     /**
-     * This method encodes and sends a spinel frame to Radio Co-processor (RCP) over the socket.
+     * Encodes and sends a spinel frame to Radio Co-processor (RCP) over the socket.
      *
      * @param[in] aFrame   A pointer to buffer containing the spinel frame to send.
      * @param[in] aLength  The length (number of bytes) in the frame.
@@ -104,7 +102,7 @@ public:
     otError SendFrame(const uint8_t *aFrame, uint16_t aLength);
 
     /**
-     * This method waits for receiving part or all of spinel frame within specified interval.
+     * Waits for receiving part or all of spinel frame within specified interval.
      *
      * @param[in] aTimeoutUs  The timeout value in microseconds.
      *
@@ -115,7 +113,7 @@ public:
     otError WaitForFrame(uint64_t aTimeoutUs);
 
     /**
-     * This method updates the file descriptor sets with file descriptors used by the radio driver.
+     * Updates the file descriptor sets with file descriptors used by the radio driver.
      *
      * @param[in,out]   aMainloopContext  A pointer to the mainloop context containing fd_sets.
      *
@@ -123,7 +121,7 @@ public:
     void UpdateFdSet(void *aMainloopContext);
 
     /**
-     * This method performs radio driver processing.
+     * Performs radio driver processing.
      *
      * @param[in]   aMainloopContext  A pointer to the mainloop context containing fd_sets.
      *
@@ -131,7 +129,7 @@ public:
     void Process(const void *aMainloopContext);
 
     /**
-     * This method returns the bus speed between the host and the radio.
+     * Returns the bus speed between the host and the radio.
      *
      * @returns  Bus speed in bits/second.
      *
@@ -139,7 +137,7 @@ public:
     uint32_t GetBusSpeed(void) const;
 
     /**
-     * This method hardware resets the RCP.
+     * Hardware resets the RCP.
      *
      * @retval OT_ERROR_NONE            Successfully reset the RCP.
      * @retval OT_ERROR_NOT_IMPLEMENT   The hardware reset is not implemented.
@@ -148,12 +146,26 @@ public:
     otError HardwareReset(void);
 
     /**
-     * This method returns the RCP interface metrics.
+     * Returns the RCP interface metrics.
      *
      * @returns The RCP interface metrics.
      *
      */
     const otRcpInterfaceMetrics *GetRcpInterfaceMetrics(void) const;
+
+    /**
+     * Indicates whether or not the given interface matches this interface name.
+     *
+     * @param[in] aInterfaceName A pointer to the interface name.
+     *
+     * @retval TRUE   The given interface name matches this interface name.
+     * @retval FALSE  The given interface name doesn't match this interface name.
+     */
+    static bool IsInterfaceNameMatch(const char *aInterfaceName)
+    {
+        static const char *kInterfaceName = OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_URL_PROTOCOL_NAME;
+        return (strncmp(aInterfaceName, kInterfaceName, strlen(kInterfaceName)) == 0);
+    }
 };
 
 } // namespace Posix

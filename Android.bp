@@ -85,9 +85,10 @@ cc_defaults {
         "-DPACKAGE_TARNAME=\"openthread\"",
         "-DPACKAGE_URL=\"http://github.com/openthread/openthread\"",
         "-DSPINEL_PLATFORM_HEADER=\"spinel_platform.h\"",
+        "-DOPENTHREAD_POSIX_CONFIG_SPINEL_HDLC_INTERFACE_ENABLE=0",
+        "-DOPENTHREAD_POSIX_CONFIG_SPINEL_SPI_INTERFACE_ENABLE=0",
+        "-DOPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_ENABLE=1",
     ],
-    apex_available: [ "com.android.threadnetwork" ],
-    min_sdk_version: "33",
 }
 
 genrule {
@@ -105,13 +106,7 @@ soong_config_module_type {
     module_type: "cc_defaults",
     config_namespace: "openthread",
     bool_variables: ["diag"],
-    variables: ["rcp_bus"],
     properties: ["cflags"],
-}
-
-soong_config_string_variable {
-    name: "rcp_bus",
-    values: ["spi", "uart", "hal"],
 }
 
 ot_config_cc_defaults {
@@ -120,25 +115,7 @@ ot_config_cc_defaults {
         diag: {
             cflags: ["-DOPENTHREAD_CONFIG_DIAG_ENABLE=1"],
         },
-        rcp_bus: {
-            spi: {
-                cflags: ["-DOPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_SPI"]
-            },
-            uart: {
-                cflags: [
-                    "-DOPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_UART",
-                    "-DOPENTHREAD_POSIX_CONFIG_RCP_PTY_ENABLE=1",
-                ]
-            },
-            conditions_default: {
-                cflags: [
-                    "-DOPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_VENDOR",
-                ]
-            },
-        },
     },
-    apex_available: [ "com.android.threadnetwork" ],
-    min_sdk_version: "33",
 }
 
 filegroup {
@@ -183,6 +160,7 @@ filegroup {
         "src/core/api/netdiag_api.cpp",
         "src/core/api/network_time_api.cpp",
         "src/core/api/ping_sender_api.cpp",
+        "src/core/api/radio_stats_api.cpp",
         "src/core/api/random_crypto_api.cpp",
         "src/core/api/random_noncrypto_api.cpp",
         "src/core/api/server_api.cpp",
@@ -307,6 +285,7 @@ filegroup {
         "src/core/thread/announce_begin_server.cpp",
         "src/core/thread/announce_sender.cpp",
         "src/core/thread/anycast_locator.cpp",
+        "src/core/thread/child.cpp",
         "src/core/thread/child_supervision.cpp",
         "src/core/thread/child_table.cpp",
         "src/core/thread/csl_tx_scheduler.cpp",
@@ -327,6 +306,7 @@ filegroup {
         "src/core/thread/mle_tlvs.cpp",
         "src/core/thread/mle_types.cpp",
         "src/core/thread/mlr_manager.cpp",
+        "src/core/thread/neighbor.cpp",
         "src/core/thread/neighbor_table.cpp",
         "src/core/thread/network_data.cpp",
         "src/core/thread/network_data_leader.cpp",
@@ -338,14 +318,15 @@ filegroup {
         "src/core/thread/network_data_tlvs.cpp",
         "src/core/thread/network_data_types.cpp",
         "src/core/thread/network_diagnostic.cpp",
+        "src/core/thread/network_diagnostic_tlvs.cpp",
         "src/core/thread/panid_query_server.cpp",
         "src/core/thread/radio_selector.cpp",
+        "src/core/thread/router.cpp",
         "src/core/thread/router_table.cpp",
         "src/core/thread/src_match_controller.cpp",
         "src/core/thread/thread_netif.cpp",
         "src/core/thread/time_sync_service.cpp",
         "src/core/thread/tmf.cpp",
-        "src/core/thread/topology.cpp",
         "src/core/thread/uri_paths.cpp",
         "src/core/utils/channel_manager.cpp",
         "src/core/utils/channel_monitor.cpp",
@@ -367,13 +348,16 @@ filegroup {
     name: "openthread_cli_srcs",
     srcs: [
         "src/cli/cli.cpp",
+        "src/cli/cli_bbr.cpp",
         "src/cli/cli_br.cpp",
         "src/cli/cli_coap.cpp",
         "src/cli/cli_coap_secure.cpp",
         "src/cli/cli_commissioner.cpp",
         "src/cli/cli_dataset.cpp",
+        "src/cli/cli_dns.cpp",
         "src/cli/cli_history.cpp",
         "src/cli/cli_joiner.cpp",
+        "src/cli/cli_mac_filter.cpp",
         "src/cli/cli_network_data.cpp",
         "src/cli/cli_output.cpp",
         "src/cli/cli_srp_client.cpp",
@@ -470,6 +454,7 @@ filegroup {
         "src/posix/platform/alarm.cpp",
         "src/posix/platform/backbone.cpp",
         "src/posix/platform/backtrace.cpp",
+        "src/posix/platform/configuration.cpp",
         "src/posix/platform/config_file.cpp",
         "src/posix/platform/daemon.cpp",
         "src/posix/platform/entropy.cpp",
@@ -483,7 +468,6 @@ filegroup {
         "src/posix/platform/multicast_routing.cpp",
         "src/posix/platform/netif.cpp",
         "src/posix/platform/power.cpp",
-        "src/posix/platform/power_updater.cpp",
         "src/posix/platform/radio.cpp",
         "src/posix/platform/radio_url.cpp",
         "src/posix/platform/resolver.cpp",
@@ -498,7 +482,13 @@ filegroup {
 
 cc_library_static {
     name: "ot-core",
-    defaults: ["ot_posix_cflags_defaults", "ot_config_defaults"],
+    apex_available: [ "com.android.tethering" ],
+    min_sdk_version: "30",
+    defaults: [
+        "ot_config_defaults",
+        "ot-daemon-debuggable-cc-defaults",
+        "ot_posix_cflags_defaults",
+    ],
     generated_headers: ["ot_version_header"],
 
     local_include_dirs: [
@@ -523,6 +513,12 @@ cc_library_static {
     cppflags: [
         "-pedantic-errors",
         "-Wno-non-virtual-dtor",
+        // Background: the HAL client implementation requires features which
+        // are available on only 31+, but the Tethering module requires the
+        // ot-daemon binary to support 30+.
+        // It's safe to suppress this warning because ot-daemon will never
+        // run below Android U (34).
+        "-Wno-unguarded-availability",
     ],
 
     vintf_fragments: ["src/android/thread_network_hal/device_manifest.xml"],
@@ -542,6 +538,7 @@ cc_library_static {
         "src/android/thread_network_hal/vendor_interface.cpp",
         "src/lib/hdlc/hdlc.cpp",
         "src/lib/platform/exit_code.c",
+        "src/lib/spinel/radio_spinel.cpp",
         "src/lib/spinel/spinel.c",
         "src/lib/spinel/spinel_buffer.cpp",
         "src/lib/spinel/spinel_decoder.cpp",
@@ -552,8 +549,13 @@ cc_library_static {
 
 cc_library_static {
     name: "libopenthread-cli",
-
-    defaults: ["ot_posix_cflags_defaults", "ot_config_defaults"],
+    apex_available: [ "com.android.tethering" ],
+    min_sdk_version: "30",
+    defaults: [
+        "ot_config_defaults",
+        "ot-daemon-debuggable-cc-defaults",
+        "ot_posix_cflags_defaults",
+    ],
     generated_headers: ["ot_version_header"],
 
     local_include_dirs: [
@@ -580,13 +582,16 @@ cc_library_static {
 
     srcs: [
         "src/cli/cli.cpp",
+        "src/cli/cli_bbr.cpp",
         "src/cli/cli_br.cpp",
         "src/cli/cli_coap.cpp",
         "src/cli/cli_coap_secure.cpp",
         "src/cli/cli_commissioner.cpp",
         "src/cli/cli_dataset.cpp",
+        "src/cli/cli_dns.cpp",
         "src/cli/cli_history.cpp",
         "src/cli/cli_joiner.cpp",
+        "src/cli/cli_mac_filter.cpp",
         "src/cli/cli_network_data.cpp",
         "src/cli/cli_output.cpp",
         "src/cli/cli_srp_client.cpp",
@@ -598,7 +603,7 @@ cc_library_static {
 
 cc_binary {
     name: "ot-ctl",
-
+    vendor: true,
     defaults: ["ot_posix_cflags_defaults"],
     generated_headers: ["ot_version_header"],
 
@@ -652,6 +657,7 @@ cc_defaults {
         "-DOPENTHREAD_CONFIG_FILE=\"openthread-config-android-version.h\"",
         "-DOPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE=1",
         "-DOPENTHREAD_CONFIG_MAC_FILTER_ENABLE=1",
+        "-DOPENTHREAD_CONFIG_MLR_ENABLE=1",
         "-DOPENTHREAD_CONFIG_NCP_HDLC_ENABLE=1",
         "-DOPENTHREAD_CONFIG_PING_SENDER_ENABLE=1",
         "-DOPENTHREAD_EXAMPLES_SIMULATION=1",
@@ -792,7 +798,7 @@ cc_library_static {
     ],
 
     cflags: [
-        "-DOPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_SPI",
+        "-DOPENTHREAD_POSIX_CONFIG_SPINEL_SPI_INTERFACE_ENABLE=1",
     ],
 
     srcs: [
@@ -852,6 +858,7 @@ cc_library_static {
     ],
 
     srcs: [
+        "src/lib/spinel/radio_spinel.cpp",
         "src/lib/spinel/spinel.c",
         "src/lib/spinel/spinel_buffer.cpp",
         "src/lib/spinel/spinel_decoder.cpp",
@@ -925,7 +932,7 @@ cc_library_static {
     ],
 
     cflags: [
-        "-DOPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_UART",
+        "-DOPENTHREAD_POSIX_CONFIG_SPINEL_SPI_INTERFACE_ENABLE=1",
         "-DOPENTHREAD_OSIX_CONFIG_RCP_PTY_ENABLE=1",
     ],
 
