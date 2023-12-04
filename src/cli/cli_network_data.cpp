@@ -43,6 +43,15 @@
 namespace ot {
 namespace Cli {
 
+NetworkData::NetworkData(otInstance *aInstance, OutputImplementer &aOutputImplementer)
+    : Output(aInstance, aOutputImplementer)
+{
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+    mFullCallbackWasCalled = false;
+    otBorderRouterSetNetDataFullCallback(aInstance, HandleNetdataFull, this);
+#endif
+}
+
 void NetworkData::PrefixFlagsToString(const otBorderRouterConfig &aConfig, FlagsString &aString)
 {
     char *flagsPtr = &aString[0];
@@ -123,6 +132,11 @@ void NetworkData::RouteFlagsToString(const otExternalRouteConfig &aConfig, Flags
     if (aConfig.mNat64)
     {
         *flagsPtr++ = 'n';
+    }
+
+    if (aConfig.mAdvPio)
+    {
+        *flagsPtr++ = 'a';
     }
 
     *flagsPtr = '\0';
@@ -648,6 +662,33 @@ exit:
     return;
 }
 
+void NetworkData::OutputCommissioningDataset(bool aLocal)
+{
+    otCommissioningDataset dataset;
+
+    VerifyOrExit(!aLocal);
+
+    otNetDataGetCommissioningDataset(GetInstancePtr(), &dataset);
+
+    OutputLine("Commissioning:");
+
+    dataset.mIsSessionIdSet ? OutputFormat("%u ", dataset.mSessionId) : OutputFormat("- ");
+    dataset.mIsLocatorSet ? OutputFormat("%04x ", dataset.mLocator) : OutputFormat("- ");
+    dataset.mIsJoinerUdpPortSet ? OutputFormat("%u ", dataset.mJoinerUdpPort) : OutputFormat("- ");
+    dataset.mIsSteeringDataSet ? OutputBytes(dataset.mSteeringData.m8, dataset.mSteeringData.mLength)
+                               : OutputFormat("-");
+
+    if (dataset.mHasExtraTlv)
+    {
+        OutputFormat(" e");
+    }
+
+    OutputNewLine();
+
+exit:
+    return;
+}
+
 otError NetworkData::OutputBinary(bool aLocal)
 {
     otError error;
@@ -687,6 +728,8 @@ exit:
  * 44970 01 9a04b000000e10 s 4000
  * Contexts:
  * fd00:dead:beef:cafe::/64 1 c
+ * Commissioning:
+ * 1248 dc00 9988 00000000000120000000000000000000 e
  * Done
  * @endcode
  * @code
@@ -736,6 +779,14 @@ exit:
  * * The prefix
  * * Context ID
  * * Compress flag (`c` if marked or `-` otherwise).
+ * @par
+ * Commissioning Dataset information is printed under `Commissioning` header:
+ * * Session ID if present in Dataset or `-` otherwise
+ * * Border Agent RLOC16 (in hex) if present in Dataset or `-` otherwise
+ * * Joiner UDP port number if present in Dataset or `-` otherwise
+ * * Steering Data (as hex bytes) if present in Dataset or `-` otherwise
+ * * Flags:
+ *   * e: If Dataset contains any extra unknown TLV
  * @par
  * @moreinfo{@netdata}.
  * @csa{br omrprefix}
@@ -795,12 +846,65 @@ template <> otError NetworkData::Process<Cmd("show")>(Arg aArgs[])
         OutputRoutes(local);
         OutputServices(local);
         OutputLowpanContexts(local);
+        OutputCommissioningDataset(local);
         error = OT_ERROR_NONE;
     }
 
 exit:
     return error;
 }
+
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+template <> otError NetworkData::Process<Cmd("full")>(Arg aArgs[])
+{
+    otError error = OT_ERROR_NONE;
+
+    /**
+     * @cli netdata full
+     * @code
+     * netdata full
+     * no
+     * Done
+     * @endcode
+     * @par
+     * Print "yes" or "no" indicating whether or not the "net data full" callback has been invoked since start of
+     * Thread operation or since the last time `netdata full reset` was used to reset the flag.
+     * This command requires `OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL`.
+     * The "net data full" callback is invoked whenever:
+     * - The device is acting as a leader and receives a Network Data registration from a Border Router (BR) that it
+     *   cannot add to Network Data (running out of space).
+     * - The device is acting as a BR and new entries cannot be added to its local Network Data.
+     * - The device is acting as a BR and tries to register its local Network Data entries with the leader, but
+     *   determines that its local entries will not fit.
+     * @sa otBorderRouterSetNetDataFullCallback
+     */
+    if (aArgs[0].IsEmpty())
+    {
+        OutputLine(mFullCallbackWasCalled ? "yes" : "no");
+    }
+    /**
+     * @cli netdata full reset
+     * @code
+     * netdata full reset
+     * Done
+     * @endcode
+     * @par
+     * Reset the flag tracking whether "net data full" callback was invoked.
+     */
+    else if (aArgs[0] == "reset")
+    {
+        VerifyOrExit(aArgs[1].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
+        mFullCallbackWasCalled = false;
+    }
+    else
+    {
+        error = OT_ERROR_INVALID_ARGS;
+    }
+
+exit:
+    return error;
+}
+#endif // OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
 
 otError NetworkData::Process(Arg aArgs[])
 {
@@ -810,6 +914,9 @@ otError NetworkData::Process(Arg aArgs[])
     }
 
     static constexpr Command kCommands[] = {
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+        CmdEntry("full"),
+#endif
         CmdEntry("length"),
         CmdEntry("maxlength"),
 #if OPENTHREAD_CONFIG_NETDATA_PUBLISHER_ENABLE

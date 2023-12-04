@@ -45,10 +45,9 @@
 #define OPENTHREAD_CONFIG_CLI_UART_RX_BUFFER_SIZE 3500
 
 /**
- * Disables the default posix infrastructure interface implementation
- * so that we can can use the Android specific implementation.
+ * Enables the default posix infrastructure interface implementation.
  */
-#define OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE 0
+#define OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE 1
 
 /**
  * Disables the default posix TUN interface implementation
@@ -62,3 +61,28 @@
 // FIXME(296975198): refactor to skip posix/udp.cpp when the tunnel interface is not
 // available, instead of crash
 #define OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE 0
+
+/**
+ * Disables the DAEMON_CLI feature because the Android build system default is built with "Release"
+ * type all build buid variants (user, userdebug and eng), but we want to disable CLI for OT daemon
+ * in product.
+ *
+ * This flag will be overriden in "product_variables.debuggable.cflags" to enable CLI in userdebug
+ * or eng build, see "ot-daemon-debuggable-cc-defaults".
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_DAEMON_CLI_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_DAEMON_CLI_ENABLE 0
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_THREAD_NETIF_DEFAULT_NAME
+ *
+ * Define the Thread default network interface name.
+ *
+ */
+#define OPENTHREAD_POSIX_CONFIG_THREAD_NETIF_DEFAULT_NAME "thread-wpan"
+
+/**
+ * Avoids killing the ot-daemon process when the infra link disappears.
+ */
+#define OPENTHREAD_POSIX_CONFIG_EXIT_ON_INFRA_NETIF_LOST_ENABLE 0

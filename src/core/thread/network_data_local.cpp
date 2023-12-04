@@ -37,9 +37,9 @@
 
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
-#include "common/instance.hpp"
 #include "common/locator_getters.hpp"
 #include "common/log.hpp"
+#include "instance/instance.hpp"
 #include "mac/mac_types.hpp"
 #include "thread/mle_types.hpp"
 #include "thread/thread_netif.hpp"
@@ -134,6 +134,13 @@ Error Local::AddPrefix(const Ip6::Prefix &aPrefix, NetworkDataTlv::Type aSubTlvT
     DumpDebg("AddPrefix", GetBytes(), GetLength());
 
 exit:
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+    if (error == kErrorNoBufs)
+    {
+        Get<Notifier>().SignalNetworkDataFull();
+    }
+#endif
+
     return error;
 }
 
@@ -211,6 +218,13 @@ Error Local::AddService(uint32_t           aEnterpriseNumber,
     DumpDebg("AddService", GetBytes(), GetLength());
 
 exit:
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+    if (error == kErrorNoBufs)
+    {
+        Get<Notifier>().SignalNetworkDataFull();
+    }
+#endif
+
     return error;
 }
 

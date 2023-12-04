@@ -28,7 +28,7 @@
 
 #include "posix/platform/multicast_routing.hpp"
 
-#if OPENTHREAD_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
+#if OPENTHREAD_POSIX_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
 
 #include <assert.h>
 #include <net/if.h>
@@ -159,7 +159,7 @@ void MulticastRoutingManager::UpdateMldReport(const Ip6::Address &aAddress, bool
     struct ipv6_mreq ipv6mr;
     otError          error = OT_ERROR_NONE;
 
-    ipv6mr.ipv6mr_interface = if_nametoindex(gBackboneNetifName);
+    ipv6mr.ipv6mr_interface = if_nametoindex(otSysGetInfraNetifName());
     memcpy(&ipv6mr.ipv6mr_multiaddr, aAddress.GetBytes(), sizeof(ipv6mr.ipv6mr_multiaddr));
     error = (setsockopt(mMulticastRouterSock, IPPROTO_IPV6, (isAdd ? IPV6_JOIN_GROUP : IPV6_LEAVE_GROUP),
                         (void *)&ipv6mr, sizeof(ipv6mr))
@@ -243,7 +243,7 @@ void MulticastRoutingManager::InitMulticastRouterSock(void)
 
     // Add Backbone network interface to MIF
     mif6ctl.mif6c_mifi = kMifIndexBackbone;
-    mif6ctl.mif6c_pifi = if_nametoindex(gBackboneNetifName);
+    mif6ctl.mif6c_pifi = otSysGetInfraNetifIndex();
     VerifyOrDie(mif6ctl.mif6c_pifi > 0, OT_EXIT_ERROR_ERRNO);
     VerifyOrDie(0 == setsockopt(mMulticastRouterSock, IPPROTO_IPV6, MRT6_ADD_MIF, &mif6ctl, sizeof(mif6ctl)),
                 OT_EXIT_ERROR_ERRNO);
@@ -615,4 +615,4 @@ void MulticastRoutingManager::RemoveMulticastForwardingCache(
 } // namespace Posix
 } // namespace ot
 
-#endif // OPENTHREAD_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
+#endif // OPENTHREAD_POSIX_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE

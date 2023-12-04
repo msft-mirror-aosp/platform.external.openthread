@@ -61,7 +61,7 @@ class JoinerRouter : public InstanceLocator, private NonCopyable
 
 public:
     /**
-     * This constructor initializes the Joiner Router object.
+     * Initializes the Joiner Router object.
      *
      * @param[in]  aInstance     A reference to the OpenThread instance.
      *
@@ -69,15 +69,15 @@ public:
     explicit JoinerRouter(Instance &aInstance);
 
     /**
-     * This method returns the Joiner UDP Port.
+     * Returns the Joiner UDP Port.
      *
-     * @returns The Joiner UDP Port number .
+     * @returns The Joiner UDP Port number.
      *
      */
-    uint16_t GetJoinerUdpPort(void);
+    uint16_t GetJoinerUdpPort(void) const;
 
     /**
-     * This method sets the Joiner UDP Port.
+     * Sets the Joiner UDP Port.
      *
      * @param[in]  aJoinerUdpPort  The Joiner UDP Port number.
      *
@@ -85,6 +85,7 @@ public:
     void SetJoinerUdpPort(uint16_t aJoinerUdpPort);
 
 private:
+    static constexpr uint16_t kDefaultJoinerUdpPort = OPENTHREAD_CONFIG_JOINER_UDP_PORT;
     static constexpr uint32_t kJoinerEntrustTxDelay = 50; // in msec
 
     struct JoinerEntrustMetadata

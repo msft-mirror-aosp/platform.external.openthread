@@ -31,7 +31,7 @@
 
 #include "openthread-posix-config.h"
 
-#if OPENTHREAD_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
+#if OPENTHREAD_POSIX_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,6 +58,7 @@ public:
     {
     }
 
+    bool IsEnabled(void) const { return mMulticastRouterSock >= 0; }
     void SetUp(void);
     void TearDown(void);
     void Update(otSysMainloopContext &aContext) override;
@@ -110,7 +111,6 @@ private:
     void    Remove(const Ip6::Address &aAddress);
     void    UpdateMldReport(const Ip6::Address &aAddress, bool isAdd);
     bool    HasMulticastListener(const Ip6::Address &aAddress) const;
-    bool    IsEnabled(void) const { return mMulticastRouterSock >= 0; }
     void    InitMulticastRouterSock(void);
     void    FinalizeMulticastRouterSock(void);
     void    ProcessMulticastRouterMessages(void);
@@ -140,6 +140,6 @@ private:
 } // namespace Posix
 } // namespace ot
 
-#endif // OPENTHREAD_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
+#endif // OPENTHREAD_POSIX_CONFIG_BACKBONE_ROUTER_MULTICAST_ROUTING_ENABLE
 
 #endif // OT_POSIX_PLATFORM_MULTICAST_ROUTING_HPP_

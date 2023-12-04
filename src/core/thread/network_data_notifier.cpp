@@ -36,9 +36,9 @@
 #if OPENTHREAD_FTD || OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE || OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
 
 #include "common/code_utils.hpp"
-#include "common/instance.hpp"
 #include "common/locator_getters.hpp"
 #include "common/log.hpp"
+#include "instance/instance.hpp"
 #include "thread/network_data_leader.hpp"
 #include "thread/network_data_local.hpp"
 #include "thread/tmf.hpp"
@@ -53,6 +53,9 @@ Notifier::Notifier(Instance &aInstance)
     : InstanceLocator(aInstance)
     , mTimer(aInstance)
     , mSynchronizeDataTask(aInstance)
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+    , mNetDataFullTask(aInstance)
+#endif
     , mNextDelay(0)
     , mOldRloc(Mac::kShortAddrInvalid)
     , mWaitingForResponse(false)
@@ -105,7 +108,7 @@ exit:
         break;
 #if OPENTHREAD_FTD
     case kErrorInvalidState:
-        mTimer.Start(Time::SecToMsec(Get<Mle::MleRouter>().GetRouterSelectionJitterTimeout() + 1));
+        mTimer.Start(Time::SecToMsec(Get<Mle::MleRouter>().GetRouterRoleTransitionTimeout() + 1));
         break;
 #endif
     case kErrorNotFound:
@@ -201,6 +204,10 @@ Error Notifier::SendServerDataNotification(uint16_t aOldRloc16, const NetworkDat
         tlv.SetLength(aNetworkData->GetLength());
         SuccessOrExit(error = message->Append(tlv));
         SuccessOrExit(error = message->AppendBytes(aNetworkData->GetBytes(), aNetworkData->GetLength()));
+
+#if OPENTHREAD_FTD && OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+        Get<Leader>().CheckForNetDataGettingFull(*aNetworkData, aOldRloc16);
+#endif
     }
 
     if (aOldRloc16 != Mac::kShortAddrInvalid)
@@ -272,6 +279,15 @@ void Notifier::HandleCoapResponse(Error aResult)
         OT_ASSERT(false);
     }
 }
+
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+void Notifier::SetNetDataFullCallback(NetDataCallback aCallback, void *aContext)
+{
+    mNetDataFullCallback.Set(aCallback, aContext);
+}
+
+void Notifier::HandleNetDataFull(void) { mNetDataFullCallback.InvokeIfSet(); }
+#endif
 
 #if OPENTHREAD_FTD && OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE && OPENTHREAD_CONFIG_BORDER_ROUTER_REQUEST_ROUTER_ROLE
 
