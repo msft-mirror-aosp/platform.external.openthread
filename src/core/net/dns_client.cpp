@@ -34,9 +34,9 @@
 #include "common/as_core_type.hpp"
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
-#include "common/instance.hpp"
 #include "common/locator_getters.hpp"
 #include "common/log.hpp"
+#include "instance/instance.hpp"
 #include "net/udp6.hpp"
 #include "thread/network_data_types.hpp"
 #include "thread/thread_netif.hpp"
@@ -48,11 +48,6 @@
 
 namespace ot {
 namespace Dns {
-
-#if OPENTHREAD_CONFIG_DNS_CLIENT_OVER_TCP_ENABLE
-using ot::Encoding::BigEndian::ReadUint16;
-using ot::Encoding::BigEndian::WriteUint16;
-#endif
 
 RegisterLogModule("DnsClient");
 
@@ -168,7 +163,10 @@ Error Client::Response::CheckForHostNameAlias(Section aSection, Name &aHostName)
 {
     // If the response includes a CNAME record mapping the query host
     // name to a canonical name, we update `aHostName` to the new alias
-    // name. Otherwise `aHostName` remains as before.
+    // name. Otherwise `aHostName` remains as before. This method handles
+    // when there are multiple CNAME records mapping the host name multiple
+    // times. We limit number of changes to `kMaxCnameAliasNameChanges`
+    // to detect and handle if the response contains CNAME record loops.
 
     Error       error;
     uint16_t    offset;
@@ -177,26 +175,31 @@ Error Client::Response::CheckForHostNameAlias(Section aSection, Name &aHostName)
 
     VerifyOrExit(mMessage != nullptr, error = kErrorNotFound);
 
-    SelectSection(aSection, offset, numRecords);
-    error = ResourceRecord::FindRecord(*mMessage, offset, numRecords, /* aIndex */ 0, aHostName, cnameRecord);
-
-    switch (error)
+    for (uint16_t counter = 0; counter < kMaxCnameAliasNameChanges; counter++)
     {
-    case kErrorNone:
+        SelectSection(aSection, offset, numRecords);
+        error = ResourceRecord::FindRecord(*mMessage, offset, numRecords, /* aIndex */ 0, aHostName, cnameRecord);
+
+        if (error == kErrorNotFound)
+        {
+            error = kErrorNone;
+            ExitNow();
+        }
+
+        SuccessOrExit(error);
+
         // A CNAME record was found. `offset` now points to after the
         // last read byte within the `mMessage` into the `cnameRecord`
         // (which is the start of the new canonical name).
+
         aHostName.SetFromMessage(*mMessage, offset);
-        error = Name::ParseName(*mMessage, offset);
-        break;
+        SuccessOrExit(error = Name::ParseName(*mMessage, offset));
 
-    case kErrorNotFound:
-        error = kErrorNone;
-        break;
-
-    default:
-        break;
+        // Loop back to check if there may be a CNAME record for the
+        // new `aHostName`.
     }
+
+    error = kErrorParse;
 
 exit:
     return error;
@@ -308,6 +311,8 @@ Error Client::Response::ReadServiceInfo(Section aSection, const Name &aName, Ser
     }
 
     // Search in additional section for AAAA record for the host name.
+
+    VerifyOrExit(AsCoreType(&aServiceInfo.mHostAddress).IsUnspecified());
 
     error = FindHostAddress(kAdditionalDataSection, hostName, /* aIndex */ 0, AsCoreType(&aServiceInfo.mHostAddress),
                             aServiceInfo.mHostAddressTtl);
@@ -598,6 +603,27 @@ Error Client::ServiceResponse::GetServiceInfo(ServiceInfo &aServiceInfo) const
 
         info.ReadFrom(*response->mQuery);
 
+        switch (info.mQueryType)
+        {
+        case kIp6AddressQuery:
+#if OPENTHREAD_CONFIG_DNS_CLIENT_NAT64_ENABLE
+        case kIp4AddressQuery:
+#endif
+            IgnoreError(response->FindHostAddress(kAnswerSection, name, /* aIndex */ 0,
+                                                  AsCoreType(&aServiceInfo.mHostAddress),
+                                                  aServiceInfo.mHostAddressTtl));
+
+            continue; // to `for()` loop
+
+        case kServiceQuerySrvTxt:
+        case kServiceQuerySrv:
+        case kServiceQueryTxt:
+            break;
+
+        default:
+            continue;
+        }
+
         // Determine from which section we should try to read the SRV and
         // TXT records based on the query type.
         //
@@ -639,7 +665,25 @@ Error Client::ServiceResponse::GetHostAddress(const char   *aHostName,
 
     for (const Response *response = this; response != nullptr; response = response->mNext)
     {
-        error = response->FindHostAddress(kAdditionalDataSection, Name(aHostName), aIndex, aAddress, aTtl);
+        Section   section = kAdditionalDataSection;
+        QueryInfo info;
+
+        info.ReadFrom(*response->mQuery);
+
+        switch (info.mQueryType)
+        {
+        case kIp6AddressQuery:
+#if OPENTHREAD_CONFIG_DNS_CLIENT_NAT64_ENABLE
+        case kIp4AddressQuery:
+#endif
+            section = kAnswerSection;
+            break;
+
+        default:
+            break;
+        }
+
+        error = response->FindHostAddress(section, Name(aHostName), aIndex, aAddress, aTtl);
 
         if (error == kErrorNone)
         {
@@ -864,6 +908,25 @@ Error Client::ResolveService(const char        *aInstanceLabel,
                              void              *aContext,
                              const QueryConfig *aConfig)
 {
+    return Resolve(aInstanceLabel, aServiceName, aCallback, aContext, aConfig, false);
+}
+
+Error Client::ResolveServiceAndHostAddress(const char        *aInstanceLabel,
+                                           const char        *aServiceName,
+                                           ServiceCallback    aCallback,
+                                           void              *aContext,
+                                           const QueryConfig *aConfig)
+{
+    return Resolve(aInstanceLabel, aServiceName, aCallback, aContext, aConfig, true);
+}
+
+Error Client::Resolve(const char        *aInstanceLabel,
+                      const char        *aServiceName,
+                      ServiceCallback    aCallback,
+                      void              *aContext,
+                      const QueryConfig *aConfig,
+                      bool               aShouldResolveHostAddr)
+{
     QueryInfo info;
     Error     error;
     QueryType secondQueryType = kNoQuery;
@@ -873,6 +936,7 @@ Error Client::ResolveService(const char        *aInstanceLabel,
     info.Clear();
 
     info.mConfig.SetFrom(aConfig, mDefaultConfig);
+    info.mShouldResolveHostAddr = aShouldResolveHostAddr;
 
     switch (info.mConfig.GetServiceMode())
     {
@@ -887,6 +951,7 @@ Error Client::ResolveService(const char        *aInstanceLabel,
 
     case QueryConfig::kServiceModeTxt:
         info.mQueryType = kServiceQueryTxt;
+        VerifyOrExit(!info.mShouldResolveHostAddr, error = kErrorInvalidArgs);
         break;
 
     case QueryConfig::kServiceModeSrvTxt:
@@ -1102,7 +1167,7 @@ Error Client::SendQuery(Query &aQuery, QueryInfo &aInfo, bool aUpdateTimer)
             PrepareTcpMessage(*message);
             break;
         case kTcpConnectedSending:
-            WriteUint16(length, mSendBufferBytes + mSendLink.mLength);
+            BigEndian::WriteUint16(length, mSendBufferBytes + mSendLink.mLength);
             SuccessOrAssert(error = message->Read(message->GetOffset(),
                                                   (mSendBufferBytes + sizeof(uint16_t) + mSendLink.mLength), length));
             IgnoreError(mEndpoint.SendByExtension(length + sizeof(uint16_t), /* aFlags */ 0));
@@ -1273,6 +1338,10 @@ void Client::ProcessResponse(const Message &aResponseMessage)
     }
 
     // Received successful response from server.
+
+#if OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE
+    ResolveHostAddressIfNeeded(*query, aResponseMessage);
+#endif
 
     if (!CanFinalizeQuery(*query))
     {
@@ -1551,6 +1620,51 @@ exit:
     return error;
 }
 
+void Client::ResolveHostAddressIfNeeded(Query &aQuery, const Message &aResponseMessage)
+{
+    QueryInfo   info;
+    Response    response;
+    ServiceInfo serviceInfo;
+    char        hostName[Name::kMaxNameSize];
+
+    info.ReadFrom(aQuery);
+
+    VerifyOrExit(info.mQueryType == kServiceQuerySrvTxt || info.mQueryType == kServiceQuerySrv);
+    VerifyOrExit(info.mShouldResolveHostAddr);
+
+    PopulateResponse(response, aQuery, aResponseMessage);
+
+    memset(&serviceInfo, 0, sizeof(serviceInfo));
+    serviceInfo.mHostNameBuffer     = hostName;
+    serviceInfo.mHostNameBufferSize = sizeof(hostName);
+    SuccessOrExit(response.ReadServiceInfo(Response::kAnswerSection, Name(aQuery, kNameOffsetInQuery), serviceInfo));
+
+    // Check whether AAAA record for host address is provided in the SRV query response
+
+    if (AsCoreType(&serviceInfo.mHostAddress).IsUnspecified())
+    {
+        Query *newQuery;
+
+        info.mQueryType         = kIp6AddressQuery;
+        info.mMessageId         = 0;
+        info.mTransmissionCount = 0;
+        info.mMainQuery         = &FindMainQuery(aQuery);
+
+        SuccessOrExit(AllocateQuery(info, nullptr, hostName, newQuery));
+        IgnoreError(SendQuery(*newQuery, info, /* aUpdateTimer */ true));
+
+        // Update `aQuery` to be linked with new query (inserting
+        // the `newQuery` into the linked-list after `aQuery`).
+
+        info.ReadFrom(aQuery);
+        info.mNextQuery = newQuery;
+        UpdateQuery(aQuery, info);
+    }
+
+exit:
+    return;
+}
+
 #endif // OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE
 
 #if OPENTHREAD_CONFIG_DNS_CLIENT_OVER_TCP_ENABLE
@@ -1559,7 +1673,7 @@ void Client::PrepareTcpMessage(Message &aMessage)
     uint16_t length = aMessage.GetLength() - aMessage.GetOffset();
 
     // Prepending the DNS query with length of the packet according to RFC1035.
-    WriteUint16(length, mSendBufferBytes + mSendLink.mLength);
+    BigEndian::WriteUint16(length, mSendBufferBytes + mSendLink.mLength);
     SuccessOrAssert(
         aMessage.Read(aMessage.GetOffset(), (mSendBufferBytes + sizeof(uint16_t) + mSendLink.mLength), length));
     mSendLink.mLength += length + sizeof(uint16_t);
@@ -1669,7 +1783,7 @@ void Client::HandleTcpReceiveAvailable(otTcpEndpoint *aEndpoint,
         SuccessOrExit(ReadFromLinkBuffer(data, offset, *message, sizeof(uint16_t)));
 
         IgnoreError(message->Read(/* aOffset */ 0, length));
-        length = HostSwap16(length);
+        length = BigEndian::HostSwap16(length);
 
         // Try to read `length` bytes.
         IgnoreError(message->SetLength(0));

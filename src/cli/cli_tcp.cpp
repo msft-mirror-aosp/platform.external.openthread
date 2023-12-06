@@ -64,12 +64,14 @@ TcpExample::TcpExample(otInstance *aInstance, OutputImplementer &aOutputImplemen
     : Output(aInstance, aOutputImplementer)
     , mInitialized(false)
     , mEndpointConnected(false)
+    , mEndpointConnectedFastOpen(false)
     , mSendBusy(false)
     , mUseCircularSendBuffer(true)
     , mUseTls(false)
     , mTlsHandshakeComplete(false)
     , mBenchmarkBytesTotal(0)
     , mBenchmarkBytesUnsent(0)
+    , mBenchmarkTimeUsed(0)
 {
     mEndpointAndCircularSendBuffer.mEndpoint   = &mEndpoint;
     mEndpointAndCircularSendBuffer.mSendBuffer = &mSendBuffer;
@@ -83,6 +85,32 @@ void TcpExample::MbedTlsDebugOutput(void *ctx, int level, const char *file, int 
 }
 #endif // OPENTHREAD_CONFIG_TLS_ENABLE
 
+/**
+ * @cli tcp init
+ * @code
+ * tcp init tls
+ * Done
+ * @endcode
+ * @cparam tcp init [@ca{mode}] [@ca{size}]
+ * * The `mode` has three possible values:
+ *   * `tls`: Specifies that the TCP connection between two nodes should also
+ *     use the TLS protocol on top of TCP. When two nodes communicate over TCP,
+ *     both nodes must either use TLS or neither node should use TLS because
+ *     a non-TLS endpoint cannot communicate with a TLS endpoint.
+ *   * `linked` or `circular`: Either one of these options means that TLS
+ *     is not to be used, and the specified buffering type should be used for TCP
+ *     buffering. The behavior of `linked` and `circular` is identical. Examine the code
+ *     for the differences between these two buffering types.
+ *     Two endpoints of a TCP connection are not required to use the same buffering type.
+ * * The `size` parameter sets the size of the receive buffer to associate with the
+ *   example TCP endpoint. If left unspecified, the maximum size is used. The
+ *   maximum size is set in `OPENTHREAD_CONFIG_CLI_TCP_RECEIVE_BUFFER_SIZE`.
+ * @par
+ * Initializes the example TCP listener and the example TCP endpoint provided
+ * by the `tcp` CLI.
+ * @sa otTcpListenerInitialize
+ * @sa otTcpEndpointInitialize
+ */
 template <> otError TcpExample::Process<Cmd("init")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
@@ -232,6 +260,15 @@ exit:
     return error;
 }
 
+/**
+ * @cli tcp deinit
+ * @code
+ * tcp deinit
+ * Done
+ * @endcode
+ * @par api_copy
+ * #otTcpEndpointDeinitialize
+ */
 template <> otError TcpExample::Process<Cmd("deinit")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
@@ -271,6 +308,23 @@ exit:
     return error;
 }
 
+/**
+ * @cli tcp bind
+ * @code
+ * tcp bind :: 30000
+ * Done
+ * @endcode
+ * @cparam tcp bind @ca{ip} @ca{port}
+ * * `ip`: IPv6 address to bind to. If you wish to have the TCP/IPv6 stack assign
+ *   the binding IPv6 address, use the unspecified IPv6 address: `::`.
+ * * `port`: TCP port number to bind to.
+ * @par
+ * Associates an IPv6 address and a port to the example TCP endpoint provided by
+ * the `tcp` CLI. Associating the TCP endpoint to an IPv6
+ * address and port is referred to as "naming the TCP endpoint." This binds the
+ * endpoint for communication.
+ * @sa otTcpBind
+ */
 template <> otError TcpExample::Process<Cmd("bind")>(Arg aArgs[])
 {
     otError    error;
@@ -288,11 +342,40 @@ exit:
     return error;
 }
 
+/**
+ * @cli tcp connect
+ * @code
+ * tcp connect fe80:0:0:0:a8df:580a:860:ffa4 30000
+ * Done
+ * TCP: Connection established
+ * @endcode
+ * @code
+ * tcp connect 172.17.0.1 1234
+ * Connecting to synthesized IPv6 address: fdde:ad00:beef:2:0:0:ac11:1
+ * Done
+ * @endcode
+ * @cparam tcp connect @ca{ip} @ca{port} [@ca{fastopen}]
+ * * `ip`: IP address of the peer The address can be an IPv4 address,
+ *   which gets synthesized to an IPv6 address using the preferred
+ *   NAT64 prefix from the network data. The command returns `InvalidState`
+ *   when the preferred NAT64 prefix is unavailable.
+ * * `port`: TCP port number of the peer.
+ * * `fastopen`: This parameter is optional. If set to `fast`, TCP Fast Open is enabled
+ *   for this connection. Otherwise, if this parameter is set to `slow` or not used,
+ *   TCP Fast Open is disabled.
+ * @par
+ * Establishes a connection with the specified peer.
+ * @par
+ * If the connection establishment is successful, the resulting TCP connection
+ * is associated with the example TCP endpoint.
+ * @sa otTcpConnect
+ */
 template <> otError TcpExample::Process<Cmd("connect")>(Arg aArgs[])
 {
     otError    error;
     otSockAddr sockaddr;
     bool       nat64SynthesizedAddress;
+    uint32_t   flags;
 
     VerifyOrExit(mInitialized, error = OT_ERROR_INVALID_STATE);
 
@@ -305,7 +388,26 @@ template <> otError TcpExample::Process<Cmd("connect")>(Arg aArgs[])
     }
 
     SuccessOrExit(error = aArgs[1].ParseAsUint16(sockaddr.mPort));
-    VerifyOrExit(aArgs[2].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
+    if (aArgs[2].IsEmpty())
+    {
+        flags = OT_TCP_CONNECT_NO_FAST_OPEN;
+    }
+    else
+    {
+        if (aArgs[2] == "slow")
+        {
+            flags = OT_TCP_CONNECT_NO_FAST_OPEN;
+        }
+        else if (aArgs[2] == "fast")
+        {
+            flags = 0;
+        }
+        else
+        {
+            ExitNow(error = OT_ERROR_INVALID_ARGS);
+        }
+        VerifyOrExit(aArgs[3].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
+    }
 
 #if OPENTHREAD_CONFIG_TLS_ENABLE
     if (mUseTls)
@@ -319,13 +421,35 @@ template <> otError TcpExample::Process<Cmd("connect")>(Arg aArgs[])
     }
 #endif // OPENTHREAD_CONFIG_TLS_ENABLE
 
-    SuccessOrExit(error = otTcpConnect(&mEndpoint, &sockaddr, OT_TCP_CONNECT_NO_FAST_OPEN));
-    mEndpointConnected = true;
+    SuccessOrExit(error = otTcpConnect(&mEndpoint, &sockaddr, flags));
+    mEndpointConnected         = true;
+    mEndpointConnectedFastOpen = ((flags & OT_TCP_CONNECT_NO_FAST_OPEN) == 0);
+
+#if OPENTHREAD_CONFIG_TLS_ENABLE
+    if (mUseTls && mEndpointConnectedFastOpen)
+    {
+        PrepareTlsHandshake();
+        ContinueTlsHandshake();
+    }
+#endif
 
 exit:
     return error;
 }
 
+/**
+ * @cli tcp send
+ * @code
+ * tcp send hello
+ * Done
+ * @endcode
+ * @cparam tcp send @ca{message}
+ * The `message` parameter contains the message you want to send to the
+ * remote TCP endpoint.
+ * @par
+ * Sends data over the TCP connection associated with the example TCP endpoint
+ * that is provided with the `tcp` CLI.
+ */
 template <> otError TcpExample::Process<Cmd("send")>(Arg aArgs[])
 {
     otError error;
@@ -377,54 +501,130 @@ template <> otError TcpExample::Process<Cmd("benchmark")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
 
-    VerifyOrExit(!mSendBusy, error = OT_ERROR_BUSY);
-    VerifyOrExit(mBenchmarkBytesTotal == 0, error = OT_ERROR_BUSY);
-
-    if (aArgs[0].IsEmpty())
+    /**
+     * @cli tcp benchmark result
+     * @code
+     * tcp benchmark result
+     * TCP Benchmark Status: Ongoing
+     * Done
+     * @endcode
+     * @code
+     * tcp benchmark result
+     * TCP Benchmark Status: Completed
+     * TCP Benchmark Complete: Transferred 73728 bytes in 7056 milliseconds
+     * TCP Goodput: 83.592 kb/s
+     * @endcode
+     * @par
+     * Shows the latest result of the TCP benchmark test. Possible status values:
+     * * Ongoing
+     * * Completed
+     * * Untested
+     * @par
+     * This command is primarily intended for creating scripts that automate
+     * the TCP benchmark test.
+     */
+    if (aArgs[0] == "result")
     {
-        mBenchmarkBytesTotal = OPENTHREAD_CONFIG_CLI_TCP_DEFAULT_BENCHMARK_SIZE;
-    }
-    else
-    {
-        SuccessOrExit(error = aArgs[0].ParseAsUint32(mBenchmarkBytesTotal));
-        VerifyOrExit(mBenchmarkBytesTotal != 0, error = OT_ERROR_INVALID_ARGS);
-    }
-    VerifyOrExit(aArgs[1].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
-
-    mBenchmarkStart       = TimerMilli::GetNow();
-    mBenchmarkBytesUnsent = mBenchmarkBytesTotal;
-
-    if (mUseCircularSendBuffer)
-    {
-        SuccessOrExit(error = ContinueBenchmarkCircularSend());
-    }
-    else
-    {
-        uint32_t benchmarkLinksLeft = (mBenchmarkBytesTotal + sizeof(mSendBufferBytes) - 1) / sizeof(mSendBufferBytes);
-        uint32_t toSendOut          = OT_MIN(OT_ARRAY_LENGTH(mBenchmarkLinks), benchmarkLinksLeft);
-
-        /* We could also point the linked buffers directly to sBenchmarkData. */
-        memset(mSendBufferBytes, 'a', sizeof(mSendBufferBytes));
-
-        for (uint32_t i = 0; i != toSendOut; i++)
+        OutputFormat("TCP Benchmark Status: ");
+        if (mBenchmarkBytesTotal != 0)
         {
-            mBenchmarkLinks[i].mNext   = nullptr;
-            mBenchmarkLinks[i].mData   = mSendBufferBytes;
-            mBenchmarkLinks[i].mLength = sizeof(mSendBufferBytes);
-            if (i == 0 && mBenchmarkBytesTotal % sizeof(mSendBufferBytes) != 0)
-            {
-                mBenchmarkLinks[i].mLength = mBenchmarkBytesTotal % sizeof(mSendBufferBytes);
-            }
-            error = otTcpSendByReference(&mEndpoint, &mBenchmarkLinks[i],
-                                         i == toSendOut - 1 ? 0 : OT_TCP_SEND_MORE_TO_COME);
-            VerifyOrExit(error == OT_ERROR_NONE, mBenchmarkBytesTotal = 0);
+            OutputLine("Ongoing");
         }
+        else if (mBenchmarkTimeUsed != 0)
+        {
+            OutputLine("Completed");
+            OutputBenchmarkResult();
+        }
+        else
+        {
+            OutputLine("Untested");
+        }
+    }
+    /**
+     * @cli tcp benchmark run
+     * @code
+     * tcp benchmark run
+     * Done
+     * TCP Benchmark Complete: Transferred 73728 bytes in 7233 milliseconds
+     * TCP Goodput: 81.546 kb/s
+     * @endcode
+     * @cparam tcp benchmark run [@ca{size}]
+     * Use the `size` parameter to specify the number of bytes to send
+     * for the benchmark. If you do not use the `size` parameter, the default
+     * value (`OPENTHREAD_CONFIG_CLI_TCP_DEFAULT_BENCHMARK_SIZE`) is used.
+     * @par
+     * Transfers the specified number of bytes using the TCP connection
+     * currently associated with the example TCP endpoint provided by the `tcp` CLI.
+     * @note You must establish a TCP connection before you run this command.
+     */
+    else if (aArgs[0] == "run")
+    {
+        VerifyOrExit(!mSendBusy, error = OT_ERROR_BUSY);
+        VerifyOrExit(mBenchmarkBytesTotal == 0, error = OT_ERROR_BUSY);
+
+        if (aArgs[1].IsEmpty())
+        {
+            mBenchmarkBytesTotal = OPENTHREAD_CONFIG_CLI_TCP_DEFAULT_BENCHMARK_SIZE;
+        }
+        else
+        {
+            SuccessOrExit(error = aArgs[1].ParseAsUint32(mBenchmarkBytesTotal));
+            VerifyOrExit(mBenchmarkBytesTotal != 0, error = OT_ERROR_INVALID_ARGS);
+        }
+        VerifyOrExit(aArgs[2].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
+
+        mBenchmarkStart       = TimerMilli::GetNow();
+        mBenchmarkBytesUnsent = mBenchmarkBytesTotal;
+
+        if (mUseCircularSendBuffer)
+        {
+            SuccessOrExit(error = ContinueBenchmarkCircularSend());
+        }
+        else
+        {
+            uint32_t benchmarkLinksLeft =
+                (mBenchmarkBytesTotal + sizeof(mSendBufferBytes) - 1) / sizeof(mSendBufferBytes);
+            uint32_t toSendOut = OT_MIN(OT_ARRAY_LENGTH(mBenchmarkLinks), benchmarkLinksLeft);
+
+            /* We could also point the linked buffers directly to sBenchmarkData. */
+            memset(mSendBufferBytes, 'a', sizeof(mSendBufferBytes));
+
+            for (uint32_t i = 0; i != toSendOut; i++)
+            {
+                mBenchmarkLinks[i].mNext   = nullptr;
+                mBenchmarkLinks[i].mData   = mSendBufferBytes;
+                mBenchmarkLinks[i].mLength = sizeof(mSendBufferBytes);
+                if (i == 0 && mBenchmarkBytesTotal % sizeof(mSendBufferBytes) != 0)
+                {
+                    mBenchmarkLinks[i].mLength = mBenchmarkBytesTotal % sizeof(mSendBufferBytes);
+                }
+                error = otTcpSendByReference(&mEndpoint, &mBenchmarkLinks[i],
+                                             i == toSendOut - 1 ? 0 : OT_TCP_SEND_MORE_TO_COME);
+                VerifyOrExit(error == OT_ERROR_NONE, mBenchmarkBytesTotal = 0);
+            }
+        }
+    }
+    else
+    {
+        error = OT_ERROR_INVALID_ARGS;
     }
 
 exit:
     return error;
 }
 
+/**
+ * @cli tcp sendend
+ * @code
+ * tcp sendend
+ * Done
+ * @endcode
+ * @par
+ * Sends the "end of stream" signal over the TCP connection
+ * associated with the example TCP endpoint provided by the `tcp` CLI. This
+ * alerts the peer that it will not receive any more data over this TCP connection.
+ * @sa otTcpSendEndOfStream
+ */
 template <> otError TcpExample::Process<Cmd("sendend")>(Arg aArgs[])
 {
     otError error;
@@ -438,6 +638,18 @@ exit:
     return error;
 }
 
+/**
+ * @cli tcp abort
+ * @code
+ * tcp abort
+ * TCP: Connection reset
+ * Done
+ * @endcode
+ * @par
+ * Unceremoniously ends the TCP connection associated with the
+ * example TCP endpoint, transitioning the TCP endpoint to the closed state.
+ * @sa otTcpAbort
+ */
 template <> otError TcpExample::Process<Cmd("abort")>(Arg aArgs[])
 {
     otError error;
@@ -446,12 +658,32 @@ template <> otError TcpExample::Process<Cmd("abort")>(Arg aArgs[])
     VerifyOrExit(mInitialized, error = OT_ERROR_INVALID_STATE);
 
     SuccessOrExit(error = otTcpAbort(&mEndpoint));
-    mEndpointConnected = false;
+    mEndpointConnected         = false;
+    mEndpointConnectedFastOpen = false;
 
 exit:
     return error;
 }
 
+/**
+ * @cli tcp listen
+ * @code
+ * tcp listen :: 30000
+ * Done
+ * @endcode
+ * @cparam tcp listen @ca{ip} @ca{port}
+ * The following parameters are required:
+ * * `ip`: IPv6 address or the unspecified IPv6 address (`::`) of the example
+ *   TCP listener provided by the `tcp` CLI.
+ * * `port`: TCP port of the example TCP listener.
+ *   If no TCP connection is associated with the example TCP endpoint, then any
+ *   incoming connections matching the specified IPv6 address and port are accepted
+ *   and are associated with the example TCP endpoint.
+ * @par
+ * Uses the example TCP listener to listen for incoming connections on the
+ * specified IPv6 address and port.
+ * @sa otTcpListen
+ */
 template <> otError TcpExample::Process<Cmd("listen")>(Arg aArgs[])
 {
     otError    error;
@@ -470,6 +702,16 @@ exit:
     return error;
 }
 
+/**
+ * @cli tcp stoplistening
+ * @code
+ * tcp stoplistening
+ * Done
+ * @endcode
+ * @par
+ * Instructs the example TCP listener to stop listening for incoming TCP connections.
+ * @sa otTcpStopListening
+ */
 template <> otError TcpExample::Process<Cmd("stoplistening")>(Arg aArgs[])
 {
     otError error;
@@ -565,24 +807,10 @@ void TcpExample::HandleTcpEstablished(otTcpEndpoint *aEndpoint)
     OT_UNUSED_VARIABLE(aEndpoint);
     OutputLine("TCP: Connection established");
 #if OPENTHREAD_CONFIG_TLS_ENABLE
-    if (mUseTls)
+    if (mUseTls && !mEndpointConnectedFastOpen)
     {
-        int rv;
-        rv = mbedtls_ssl_set_hostname(&mSslContext, "localhost");
-        if (rv != 0)
-        {
-            OutputLine("mbedtls_ssl_set_hostname returned %d", rv);
-        }
-        rv = mbedtls_ssl_set_hs_ecjpake_password(
-            &mSslContext, reinterpret_cast<const unsigned char *>(sEcjpakePassword), sEcjpakePasswordLength);
-        if (rv != 0)
-        {
-            OutputLine("mbedtls_ssl_set_hs_ecjpake_password returned %d", rv);
-        }
-        mbedtls_ssl_set_bio(&mSslContext, &mEndpointAndCircularSendBuffer, otTcpMbedTlsSslSendCallback,
-                            otTcpMbedTlsSslRecvCallback, nullptr);
-        mTlsHandshakeComplete = false;
-        ContinueTLSHandshake();
+        PrepareTlsHandshake();
+        ContinueTlsHandshake();
     }
 #endif // OPENTHREAD_CONFIG_TLS_ENABLE
 }
@@ -634,7 +862,7 @@ void TcpExample::HandleTcpForwardProgress(otTcpEndpoint *aEndpoint, size_t aInSe
 #if OPENTHREAD_CONFIG_TLS_ENABLE
     if (mUseTls)
     {
-        ContinueTLSHandshake();
+        ContinueTlsHandshake();
     }
 #endif
 
@@ -662,8 +890,22 @@ void TcpExample::HandleTcpReceiveAvailable(otTcpEndpoint *aEndpoint,
     OT_UNUSED_VARIABLE(aBytesRemaining);
     OT_ASSERT(aEndpoint == &mEndpoint);
 
+    /* If we get data before the handshake completes, then this is a TFO connection. */
+    if (!mEndpointConnected)
+    {
+        mEndpointConnected         = true;
+        mEndpointConnectedFastOpen = true;
+
 #if OPENTHREAD_CONFIG_TLS_ENABLE
-    if (mUseTls && ContinueTLSHandshake())
+        if (mUseTls)
+        {
+            PrepareTlsHandshake();
+        }
+#endif
+    }
+
+#if OPENTHREAD_CONFIG_TLS_ENABLE
+    if (mUseTls && ContinueTlsHandshake())
     {
         return;
     }
@@ -747,8 +989,9 @@ void TcpExample::HandleTcpDisconnected(otTcpEndpoint *aEndpoint, otTcpDisconnect
     // We set this to false even for the TIME-WAIT state, so that we can reuse
     // the active socket if an incoming connection comes in instead of waiting
     // for the 2MSL timeout.
-    mEndpointConnected = false;
-    mSendBusy          = false;
+    mEndpointConnected         = false;
+    mEndpointConnectedFastOpen = false;
+    mSendBusy                  = false;
 
     // Mark the benchmark as inactive if the connection was disconnected.
     mBenchmarkBytesTotal  = 0;
@@ -777,20 +1020,11 @@ otTcpIncomingConnectionAction TcpExample::HandleTcpAcceptReady(otTcpListener    
     *aAcceptInto = &mEndpoint;
     action       = OT_TCP_INCOMING_CONNECTION_ACTION_ACCEPT;
 
-exit:
-    return action;
-}
-
-void TcpExample::HandleTcpAcceptDone(otTcpListener *aListener, otTcpEndpoint *aEndpoint, const otSockAddr *aPeer)
-{
-    OT_UNUSED_VARIABLE(aListener);
-    OT_UNUSED_VARIABLE(aEndpoint);
-
-    mEndpointConnected = true;
-    OutputFormat("Accepted connection from ");
-    OutputSockAddrLine(*aPeer);
-
 #if OPENTHREAD_CONFIG_TLS_ENABLE
+    /*
+     * Natural to wait until the AcceptDone callback but with TFO we could get data before that
+     * so it doesn't make sense to wait until then.
+     */
     if (mUseTls)
     {
         int rv;
@@ -809,6 +1043,19 @@ void TcpExample::HandleTcpAcceptDone(otTcpListener *aListener, otTcpEndpoint *aE
         }
     }
 #endif // OPENTHREAD_CONFIG_TLS_ENABLE
+
+exit:
+    return action;
+}
+
+void TcpExample::HandleTcpAcceptDone(otTcpListener *aListener, otTcpEndpoint *aEndpoint, const otSockAddr *aPeer)
+{
+    OT_UNUSED_VARIABLE(aListener);
+    OT_UNUSED_VARIABLE(aEndpoint);
+
+    mEndpointConnected = true;
+    OutputFormat("Accepted connection from ");
+    OutputSockAddrLine(*aPeer);
 }
 
 otError TcpExample::ContinueBenchmarkCircularSend(void)
@@ -860,20 +1107,48 @@ exit:
     return error;
 }
 
-void TcpExample::CompleteBenchmark(void)
+void TcpExample::OutputBenchmarkResult(void)
 {
-    uint32_t milliseconds         = TimerMilli::GetNow() - mBenchmarkStart;
-    uint32_t thousandTimesGoodput = (1000 * (mBenchmarkBytesTotal << 3) + (milliseconds >> 1)) / milliseconds;
+    uint32_t thousandTimesGoodput =
+        (1000 * (mBenchmarkLastBytesTotal << 3) + (mBenchmarkTimeUsed >> 1)) / mBenchmarkTimeUsed;
 
-    OutputLine("TCP Benchmark Complete: Transferred %lu bytes in %lu milliseconds", ToUlong(mBenchmarkBytesTotal),
-               ToUlong(milliseconds));
+    OutputLine("TCP Benchmark Complete: Transferred %lu bytes in %lu milliseconds", ToUlong(mBenchmarkLastBytesTotal),
+               ToUlong(mBenchmarkTimeUsed));
     OutputLine("TCP Goodput: %lu.%03u kb/s", ToUlong(thousandTimesGoodput / 1000),
                static_cast<uint16_t>(thousandTimesGoodput % 1000));
+}
+
+void TcpExample::CompleteBenchmark(void)
+{
+    mBenchmarkTimeUsed       = TimerMilli::GetNow() - mBenchmarkStart;
+    mBenchmarkLastBytesTotal = mBenchmarkBytesTotal;
+
+    OutputBenchmarkResult();
+
     mBenchmarkBytesTotal = 0;
 }
 
 #if OPENTHREAD_CONFIG_TLS_ENABLE
-bool TcpExample::ContinueTLSHandshake(void)
+void TcpExample::PrepareTlsHandshake(void)
+{
+    int rv;
+    rv = mbedtls_ssl_set_hostname(&mSslContext, "localhost");
+    if (rv != 0)
+    {
+        OutputLine("mbedtls_ssl_set_hostname returned %d", rv);
+    }
+    rv = mbedtls_ssl_set_hs_ecjpake_password(&mSslContext, reinterpret_cast<const unsigned char *>(sEcjpakePassword),
+                                             sEcjpakePasswordLength);
+    if (rv != 0)
+    {
+        OutputLine("mbedtls_ssl_set_hs_ecjpake_password returned %d", rv);
+    }
+    mbedtls_ssl_set_bio(&mSslContext, &mEndpointAndCircularSendBuffer, otTcpMbedTlsSslSendCallback,
+                        otTcpMbedTlsSslRecvCallback, nullptr);
+    mTlsHandshakeComplete = false;
+}
+
+bool TcpExample::ContinueTlsHandshake(void)
 {
     bool wasNotAlreadyDone = false;
     int  rv;

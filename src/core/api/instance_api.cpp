@@ -58,6 +58,16 @@
 using namespace ot;
 
 #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
+#if OPENTHREAD_CONFIG_MULTIPLE_STATIC_INSTANCE_ENABLE
+otInstance *otInstanceInitMultiple(uint8_t aIdx)
+{
+    Instance *instance;
+
+    instance = Instance::InitMultiple(aIdx);
+
+    return instance;
+}
+#endif // OPENTHREAD_CONFIG_MULTIPLE_STATIC_INSTANCE_ENABLE
 otInstance *otInstanceInit(void *aInstanceBuffer, size_t *aInstanceBufferSize)
 {
     Instance *instance;
@@ -69,6 +79,8 @@ otInstance *otInstanceInit(void *aInstanceBuffer, size_t *aInstanceBufferSize)
 #else
 otInstance *otInstanceInitSingle(void) { return &Instance::InitSingle(); }
 #endif // #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
+
+uint32_t otInstanceGetId(otInstance *aInstance) { return AsCoreType(aInstance).GetId(); }
 
 bool otInstanceIsInitialized(otInstance *aInstance)
 {
@@ -83,6 +95,10 @@ bool otInstanceIsInitialized(otInstance *aInstance)
 void otInstanceFinalize(otInstance *aInstance) { AsCoreType(aInstance).Finalize(); }
 
 void otInstanceReset(otInstance *aInstance) { AsCoreType(aInstance).Reset(); }
+
+#if OPENTHREAD_CONFIG_PLATFORM_BOOTLOADER_MODE_ENABLE
+otError otInstanceResetToBootloader(otInstance *aInstance) { return AsCoreType(aInstance).ResetToBootloader(); }
+#endif
 
 #if OPENTHREAD_CONFIG_UPTIME_ENABLE
 uint64_t otInstanceGetUptime(otInstance *aInstance) { return AsCoreType(aInstance).Get<Uptime>().GetUptime(); }

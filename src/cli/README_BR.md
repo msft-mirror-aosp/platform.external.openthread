@@ -8,11 +8,14 @@ Usage : `br [command] ...`
 - [disable](#disable)
 - [enable](#enable)
 - [help](#help)
+- [init](#init)
 - [nat64prefix](#nat64prefix)
 - [omrprefix](#omrprefix)
 - [onlinkprefix](#onlinkprefix)
 - [prefixtable](#prefixtable)
 - [rioprf](#rioprf)
+- [routeprf](#routeprf)
+- [routers](#routers)
 - [state](#state)
 
 ## Command Details
@@ -32,7 +35,20 @@ omrprefix
 onlinkprefix
 prefixtable
 rioprf
+routeprf
+routers
 state
+Done
+```
+
+### init
+
+Usage: `br init <interface> <enabled>`
+
+Initializes the Border Routing Manager on given infrastructure interface.
+
+```bash
+> br init 2 1
 Done
 ```
 
@@ -166,10 +182,24 @@ Usage: `br prefixtable`
 
 Get the discovered prefixes by Border Routing Manager on the infrastructure link.
 
+Info per prefix entry:
+
+- The prefix
+- Whether the prefix is on-link or route
+- Milliseconds since last received Router Advertisement containing this prefix
+- Prefix lifetime in seconds
+- Preferred lifetime in seconds only if prefix is on-link
+- Route preference (low, med, high) only if prefix is route (not on-link)
+- The router IPv6 address which advertising this prefix
+- Flags in received Router Advertisement header:
+  - M: Managed Address Config flag
+  - O: Other Config flag
+  - Stub: Stub Router flag (indicates whether the router is a stub router)
+
 ```bash
 > br prefixtable
-prefix:fd00:1234:5678:0::/64, on-link:no, ms-since-rx:29526, lifetime:1800, route-prf:med, router:ff02:0:0:0:0:0:0:1
-prefix:1200:abba:baba:0::/64, on-link:yes, ms-since-rx:29527, lifetime:1800, preferred:1800, router:ff02:0:0:0:0:0:0:1
+prefix:fd00:1234:5678:0::/64, on-link:no, ms-since-rx:29526, lifetime:1800, route-prf:med, router:ff02:0:0:0:0:0:0:1 (M:0 O:0 Stub:1)
+prefix:1200:abba:baba:0::/64, on-link:yes, ms-since-rx:29527, lifetime:1800, preferred:1800, router:ff02:0:0:0:0:0:0:1 (M:0 O:0 Stub:1)
 Done
 ```
 
@@ -204,5 +234,59 @@ Clear a previously set preference value for advertising Route Info Options (e.g.
 
 ```bash
 > br rioprf clear
+Done
+```
+
+### routeprf
+
+Usage: `br routeprf`
+
+Get the preference used for publishing routes in Thread Network Data. This may be the automatically determined route preference, or an administratively set fixed route preference - if applicable.
+
+```bash
+> br routeprf
+med
+Done
+```
+
+### routeprf \<prf\>
+
+Usage: `br routeprf high|med|low`
+
+Set the preference (which may be 'high', 'med', or 'low') to use publishing routes in Thread Network Data. Setting a preference value overrides the automatic route preference determination. It is used only for an explicit administrative configuration of a Border Router.
+
+```bash
+> br routeprf low
+Done
+```
+
+### routeprf clear
+
+Usage: `br routeprf clear`
+
+Clear a previously set preference value for publishing routes in Thread Network Data. When cleared BR will automatically determine the route preference based on device's role and link quality to parent (when acting as end-device).
+
+```bash
+> br routeprf clear
+Done
+```
+
+### routers
+
+Usage: `br routers`
+
+Get the list of discovered routers by Border Routing Manager on the infrastructure link.
+
+Info per router:
+
+- The router IPv6 address
+- Flags in received Router Advertisement header:
+  - M: Managed Address Config flag
+  - O: Other Config flag
+  - Stub: Stub Router flag (indicates whether the router is a stub router)
+
+```bash
+> br routers
+ff02:0:0:0:0:0:0:1 (M:0 O:0 Stub:1)
 Done
 ```

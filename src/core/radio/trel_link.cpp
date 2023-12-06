@@ -36,9 +36,9 @@
 
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
-#include "common/instance.hpp"
 #include "common/locator_getters.hpp"
 #include "common/log.hpp"
+#include "instance/instance.hpp"
 
 namespace ot {
 namespace Trel {
@@ -224,7 +224,7 @@ void Link::BeginTransmit(void)
         }
 
         // Prepare the ack frame (FCF followed by sequence number)
-        Encoding::LittleEndian::WriteUint16(fcf, mAckFrameBuffer);
+        LittleEndian::WriteUint16(fcf, mAckFrameBuffer);
         mAckFrameBuffer[sizeof(fcf)] = mTxFrame.GetSequence();
 
         mRxFrame.mPsdu    = mAckFrameBuffer;
@@ -251,7 +251,7 @@ void Link::InvokeSendDone(Error aError, Mac::RxFrame *aAckFrame)
 {
     SetState(kStateReceive);
 
-    Get<Mac::Mac>().RecordFrameTransmitStatus(mTxFrame, aAckFrame, aError, /* aRetryCount */ 0, /* aWillRetx */ false);
+    Get<Mac::Mac>().RecordFrameTransmitStatus(mTxFrame, aError, /* aRetryCount */ 0, /* aWillRetx */ false);
     Get<Mac::Mac>().HandleTransmitDone(mTxFrame, aAckFrame, aError);
 }
 

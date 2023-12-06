@@ -36,6 +36,8 @@
 
 #include "openthread-core-config.h"
 
+#include <openthread/border_routing.h>
+
 #include "cli/cli_config.h"
 #include "cli/cli_output.hpp"
 
@@ -45,7 +47,7 @@ namespace ot {
 namespace Cli {
 
 /**
- * This class implements the Border Router CLI interpreter.
+ * Implements the Border Router CLI interpreter.
  *
  */
 class Br : private Output
@@ -66,9 +68,15 @@ public:
     }
 
     /**
-     * This method interprets a list of CLI arguments.
+     * Processes a CLI sub-command.
      *
-     * @param[in]  aArgs        A pointer an array of command line arguments.
+     * @param[in]  aArgs     An array of command line arguments.
+     *
+     * @retval OT_ERROR_NONE              Successfully executed the CLI command.
+     * @retval OT_ERROR_PENDING           The CLI command was successfully started but final result is pending.
+     * @retval OT_ERROR_INVALID_COMMAND   Invalid or unknown CLI command.
+     * @retval OT_ERROR_INVALID_ARGS      Invalid arguments.
+     * @retval ...                        Error during execution of the CLI command.
      *
      */
     otError Process(Arg aArgs[]);
@@ -86,6 +94,7 @@ private:
     template <CommandId kCommandId> otError Process(Arg aArgs[]);
 
     otError ParsePrefixTypeArgs(Arg aArgs[], PrefixType &aFlags);
+    void    OutputRouterInfo(const otBorderRoutingRouterEntry &aEntry);
 };
 
 } // namespace Cli

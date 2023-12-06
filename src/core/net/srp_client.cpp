@@ -33,12 +33,12 @@
 #include "common/as_core_type.hpp"
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
-#include "common/instance.hpp"
 #include "common/locator_getters.hpp"
 #include "common/num_utils.hpp"
 #include "common/random.hpp"
 #include "common/settings.hpp"
 #include "common/string.hpp"
+#include "instance/instance.hpp"
 
 /**
  * @file
@@ -1054,10 +1054,7 @@ Error Client::AppendServiceInstructions(Message &aMessage, Info &aInfo)
     // In such a case, we end up using `mDefaultLease` but then we need
     // to make sure it is not greater than the selected `mKeyLease`.
 
-    if (mLease > mKeyLease)
-    {
-        mLease = mKeyLease;
-    }
+    mLease = Min(mLease, mKeyLease);
 
 exit:
     return error;
@@ -1243,21 +1240,23 @@ Error Client::AppendHostDescriptionInstruction(Message &aMessage, Info &aInfo)
 
     if (mHostInfo.IsAutoAddressEnabled())
     {
-        // Append all addresses on Thread netif excluding link-local and
-        // mesh-local addresses. If no address is appended, we include
-        // the mesh local address.
+        // Append all preferred addresses on Thread netif excluding link-local
+        // and mesh-local addresses. If no address is appended, we include
+        // the mesh local EID.
 
         mAutoHostAddressAddedMeshLocal = true;
 
         for (const Ip6::Netif::UnicastAddress &unicastAddress : Get<ThreadNetif>().GetUnicastAddresses())
         {
-            if (unicastAddress.GetAddress().IsLinkLocal() ||
-                Get<Mle::Mle>().IsMeshLocalAddress(unicastAddress.GetAddress()))
+            const Ip6::Address &address = unicastAddress.GetAddress();
+
+            if (address.IsLinkLocal() || Get<Mle::Mle>().IsMeshLocalAddress(address) || !unicastAddress.mPreferred ||
+                !unicastAddress.mValid)
             {
                 continue;
             }
 
-            SuccessOrExit(error = AppendAaaaRecord(unicastAddress.GetAddress(), aMessage, aInfo));
+            SuccessOrExit(error = AppendAaaaRecord(address, aMessage, aInfo));
             mAutoHostAddressAddedMeshLocal = false;
         }
 
@@ -1844,11 +1843,7 @@ void Client::GrowRetryWaitInterval(void)
 {
     mRetryWaitInterval =
         mRetryWaitInterval / kRetryIntervalGrowthFactorDenominator * kRetryIntervalGrowthFactorNumerator;
-
-    if (mRetryWaitInterval > kMaxRetryWaitInterval)
-    {
-        mRetryWaitInterval = kMaxRetryWaitInterval;
-    }
+    mRetryWaitInterval = Min(mRetryWaitInterval, kMaxRetryWaitInterval);
 }
 
 uint32_t Client::DetermineLeaseInterval(uint32_t aInterval, uint32_t aDefaultInterval) const

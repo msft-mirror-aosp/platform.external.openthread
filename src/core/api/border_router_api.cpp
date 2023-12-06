@@ -39,7 +39,7 @@
 
 #include "border_router/routing_manager.hpp"
 #include "common/debug.hpp"
-#include "common/instance.hpp"
+#include "instance/instance.hpp"
 
 using namespace ot;
 
@@ -117,5 +117,14 @@ otError otBorderRouterRegister(otInstance *aInstance)
 
     return kErrorNone;
 }
+
+#if OPENTHREAD_CONFIG_BORDER_ROUTER_SIGNAL_NETWORK_DATA_FULL
+void otBorderRouterSetNetDataFullCallback(otInstance                       *aInstance,
+                                          otBorderRouterNetDataFullCallback aCallback,
+                                          void                             *aContext)
+{
+    AsCoreType(aInstance).Get<NetworkData::Notifier>().SetNetDataFullCallback(aCallback, aContext);
+}
+#endif
 
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE

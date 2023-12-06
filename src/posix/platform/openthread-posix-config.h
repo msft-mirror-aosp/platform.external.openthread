@@ -86,33 +86,54 @@
 #endif
 
 /**
- * RCP bus UART.
- *
- * @note This value is also for simulated UART bus.
- *
- */
-#define OT_POSIX_RCP_BUS_UART 1
-
-/**
- * RCP bus SPI.
- *
- */
-#define OT_POSIX_RCP_BUS_SPI 2
-
-/**
- * RCP bus defined by vendors.
- *
- */
-#define OT_POSIX_RCP_BUS_VENDOR 3
-
-/**
  * @def OPENTHREAD_POSIX_CONFIG_RCP_BUS
  *
  * This setting configures what type of RCP bus to use.
  *
  */
-#ifndef OPENTHREAD_POSIX_CONFIG_RCP_BUS
-#define OPENTHREAD_POSIX_CONFIG_RCP_BUS OT_POSIX_RCP_BUS_UART
+#ifdef OPENTHREAD_POSIX_CONFIG_RCP_BUS
+#error "OPENTHREAD_POSIX_CONFIG_RCP_BUS was replaced by OPENTHREAD_POSIX_CONFIG_SPINEL_HDLC_INTERFACE_ENABLE,"\
+       "OPENTHREAD_POSIX_CONFIG_SPINEL_SPI_INTERFACE_ENABLE and OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_ENABLE"
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_SPINEL_HDLC_INTERFACE_ENABLE
+ *
+ * Define as 1 to enable the spinel HDLC interface.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_SPINEL_HDLC_INTERFACE_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_SPINEL_HDLC_INTERFACE_ENABLE 1
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_SPINEL_SPI_INTERFACE_ENABLE
+ *
+ * Define as 1 to enable the spinel SPI interface.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_SPINEL_SPI_INTERFACE_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_SPINEL_SPI_INTERFACE_ENABLE 0
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_ENABLE
+ *
+ * Define as 1 to enable the spinel vendor interface.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_ENABLE 0
+#endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_URL_PROTOCOL_NAME
+ *
+ * Define the URL protocol name of the vendor Spinel interface.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_URL_PROTOCOL_NAME
+#define OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_URL_PROTOCOL_NAME "spinel+vendor"
 #endif
 
 /**
@@ -193,7 +214,7 @@
 /**
  * @def OPENTHREAD_POSIX_CONFIG_OMR_ROUTES_PRIORITY
  *
- * This macro defines the priority of OMR routes added to kernel. The larger the number, the lower the priority. We
+ * Defines the priority of OMR routes added to kernel. The larger the number, the lower the priority. We
  * need to assign a high priority to such routes so that kernel prefers the Thread link rather than infrastructure.
  * Otherwise we may unnecessarily transmit packets via infrastructure, which potentially causes looping issue.
  *
@@ -205,7 +226,7 @@
 /**
  * @def OPENTHREAD_POSIX_CONFIG_MAX_OMR_ROUTES_NUM
  *
- * This macro defines the max number of OMR routes that can be added to kernel.
+ * Defines the max number of OMR routes that can be added to kernel.
  *
  */
 #ifndef OPENTHREAD_POSIX_CONFIG_MAX_OMR_ROUTES_NUM
@@ -225,7 +246,7 @@
 /**
  * @def OPENTHREAD_POSIX_CONFIG_EXTERNAL_ROUTE_PRIORITY
  *
- * This macro defines the priority of external routes added to kernel. The larger the number, the lower the priority. We
+ * Defines the priority of external routes added to kernel. The larger the number, the lower the priority. We
  * need to assign a low priority to such routes so that kernel prefers the infra link rather than thread. Otherwise we
  * may unnecessarily transmit packets via thread, which potentially causes performance issue. In linux, normally infra
  * link routes' metric value is not greater than 1024, hence 65535 should be big enough.
@@ -238,7 +259,7 @@
 /**
  * @def OPENTHREAD_POSIX_CONFIG_MAX_EXTERNAL_ROUTE_NUM
  *
- * This macro defines the max number of external routes that can be added to kernel.
+ * Defines the max number of external routes that can be added to kernel.
  *
  */
 #ifndef OPENTHREAD_POSIX_CONFIG_MAX_EXTERNAL_ROUTE_NUM
@@ -373,7 +394,8 @@
  * not explicit defined.
  */
 #ifndef OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
-#define OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE \
+    (OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE || OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE)
 #endif
 
 /**
@@ -400,6 +422,16 @@
 #endif
 
 /**
+ * @def OPENTHREAD_POSIX_CONFIG_CONFIGURATION_FILE_ENABLE
+ *
+ * Define as 1 to enable the configuration file support.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_CONFIGURATION_FILE_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_CONFIGURATION_FILE_ENABLE 1
+#endif
+
+/**
  * @def OPENTHREAD_POSIX_CONFIG_RCP_TIME_SYNC_INTERVAL
  *
  * This setting configures the interval (in units of microseconds) for host-rcp
@@ -407,7 +439,18 @@
  * every interval.
  *
  */
-#ifndef OPENTHREAD_POSIX_CONFIG_RCP_TIME_SYNC_INTERVAL
-#define OPENTHREAD_POSIX_CONFIG_RCP_TIME_SYNC_INTERVAL (60 * 1000 * 1000)
+#ifdef OPENTHREAD_POSIX_CONFIG_RCP_TIME_SYNC_INTERVAL
+#error "OPENTHREAD_POSIX_CONFIG_RCP_TIME_SYNC_INTERVAL was replaced by OPENTHREAD_SPINEL_CONFIG_RCP_TIME_SYNC_INTERVAL"
 #endif
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_EXIT_ON_INFRA_NETIF_LOST_ENABLE
+ *
+ * Define as 1 to let the process exit when the infra network interface is lost on the POSIX platform.
+ *
+ */
+#ifndef OPENTHREAD_POSIX_CONFIG_EXIT_ON_INFRA_NETIF_LOST_ENABLE
+#define OPENTHREAD_POSIX_CONFIG_EXIT_ON_INFRA_NETIF_LOST_ENABLE 1
+#endif
+
 #endif // OPENTHREAD_PLATFORM_CONFIG_H_

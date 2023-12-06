@@ -40,6 +40,8 @@
 #include <openthread/platform/logging.h>
 #include <openthread/platform/toolchain.h>
 
+#include "common/error.hpp"
+
 namespace ot {
 
 /**
@@ -51,7 +53,7 @@ namespace ot {
 #define OT_SHOULD_LOG (OPENTHREAD_CONFIG_LOG_OUTPUT != OPENTHREAD_CONFIG_LOG_OUTPUT_NONE)
 
 /**
- * This macro indicates whether the OpenThread logging is enabled at a given log level.
+ * Indicates whether the OpenThread logging is enabled at a given log level.
  *
  * @param[in] aLevel   The log level to check.
  *
@@ -61,7 +63,7 @@ namespace ot {
 #define OT_SHOULD_LOG_AT(aLevel) (OT_SHOULD_LOG && (OPENTHREAD_CONFIG_LOG_LEVEL >= (aLevel)))
 
 /**
- * This enumeration represents the log level.
+ * Represents the log level.
  *
  */
 enum LogLevel : uint8_t
@@ -78,9 +80,9 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG && (OPENTHREAD_CONFIG_LOG_LEVEL != OT_LOG_LEVEL_NONE)
 /**
- * This macro registers log module name.
+ * Registers log module name.
  *
- * This macro is used in a `cpp` file to register the log module name for that file before using any other logging
+ * Is used in a `cpp` file to register the log module name for that file before using any other logging
  * functions or macros (e.g., `LogInfo()` or `DumpInfo()`, ...) in the file.
  *
  * @param[in] aName  The log module name string (MUST be shorter than `kMaxLogModuleNameLength`).
@@ -102,7 +104,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_CRIT)
 /**
- * This macro emits a log message at critical log level.
+ * Emits a log message at critical log level.
  *
  * @param[in]  ...   Arguments for the format specification.
  *
@@ -114,7 +116,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_WARN)
 /**
- * This macro emits a log message at warning log level.
+ * Emits a log message at warning log level.
  *
  * @param[in]  ...   Arguments for the format specification.
  *
@@ -126,7 +128,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_NOTE)
 /**
- * This macro emits a log message at note log level.
+ * Emits a log message at note log level.
  *
  * @param[in]  ...   Arguments for the format specification.
  *
@@ -138,7 +140,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_INFO)
 /**
- * This macro emits a log message at info log level.
+ * Emits a log message at info log level.
  *
  * @param[in]  ...   Arguments for the format specification.
  *
@@ -150,7 +152,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_DEBG)
 /**
- * This macro emits a log message at debug log level.
+ * Emits a log message at debug log level.
  *
  * @param[in]  ...   Arguments for the format specification.
  *
@@ -162,7 +164,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG
 /**
- * This macro emits a log message at a given log level.
+ * Emits a log message at a given log level.
  *
  * @param[in] aLogLevel  The log level to use.
  * @param[in] ...        Argument for the format specification.
@@ -175,7 +177,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG
 /**
- * This macro emits a log message independent of the configured log level.
+ * Emits a log message independent of the configured log level.
  *
  * @param[in]  ...   Arguments for the format specification.
  *
@@ -187,7 +189,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG && OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
 /**
- * This macro emit a log message for the certification test.
+ * Emit a log message for the certification test.
  *
  * @param[in]  ...  Arguments for the format specification.
  *
@@ -199,7 +201,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_CRIT) && OPENTHREAD_CONFIG_LOG_PKT_DUMP
 /**
- * This macro generates a memory dump at log level critical.
+ * Generates a memory dump at log level critical.
  *
  * @param[in]  aText         A string that is printed before the bytes.
  * @param[in]  aData         A pointer to the data buffer.
@@ -213,7 +215,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_WARN) && OPENTHREAD_CONFIG_LOG_PKT_DUMP
 /**
- * This macro generates a memory dump at log level warning.
+ * Generates a memory dump at log level warning.
  *
  * @param[in]  aText         A string that is printed before the bytes.
  * @param[in]  aData         A pointer to the data buffer.
@@ -227,7 +229,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_NOTE) && OPENTHREAD_CONFIG_LOG_PKT_DUMP
 /**
- * This macro generates a memory dump at log level note.
+ * Generates a memory dump at log level note.
  *
  * @param[in]  aText         A string that is printed before the bytes.
  * @param[in]  aData         A pointer to the data buffer.
@@ -241,7 +243,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_INFO) && OPENTHREAD_CONFIG_LOG_PKT_DUMP
 /**
- * This macro generates a memory dump at log level info.
+ * Generates a memory dump at log level info.
  *
  * @param[in]  aText         A string that is printed before the bytes.
  * @param[in]  aData         A pointer to the data buffer.
@@ -255,7 +257,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG_AT(OT_LOG_LEVEL_DEBG) && OPENTHREAD_CONFIG_LOG_PKT_DUMP
 /**
- * This macro generates a memory dump at log level debug.
+ * Generates a memory dump at log level debug.
  *
  * @param[in]  aText         A string that is printed before the bytes.
  * @param[in]  aData         A pointer to the data buffer.
@@ -269,7 +271,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG && OPENTHREAD_CONFIG_LOG_PKT_DUMP
 /**
- * This macro generates a memory dump independent of the configured log level.
+ * Generates a memory dump independent of the configured log level.
  *
  * @param[in]  aText         A string that is printed before the bytes.
  * @param[in]  aData         A pointer to the data buffer.
@@ -281,7 +283,7 @@ constexpr uint8_t kMaxLogModuleNameLength = 14; ///< Maximum module name length
 
 #if OT_SHOULD_LOG && OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE && OPENTHREAD_CONFIG_LOG_PKT_DUMP
 /**
- * This macro generates a memory dump for certification test.
+ * Generates a memory dump for certification test.
  *
  * @param[in]  aText         A string that is printed before the bytes.
  * @param[in]  aData         A pointer to the data buffer.
@@ -332,8 +334,6 @@ public:
 
     template <LogLevel kLogLevel>
     static void DumpAtLevel(const char *aModuleName, const char *aText, const void *aData, uint16_t aDataLength);
-
-    static void DumpLine(const char *aModuleName, LogLevel aLogLevel, const uint8_t *aData, uint16_t aDataLength);
 #endif
 };
 
@@ -371,6 +371,32 @@ extern template void Logger::DumpAtLevel<kLogLevelDebg>(const char *aModuleName,
                                                         uint16_t    aDataLength);
 #endif // OPENTHREAD_CONFIG_LOG_PKT_DUMP
 #endif // OT_SHOULD_LOG
+
+typedef otLogHexDumpInfo HexDumpInfo; ///< Represents the hex dump info.
+
+/**
+ * Generates the next hex dump line.
+ *
+ * Can call this method back-to-back to generate the hex dump output line by line. On the first call the `mIterator`
+ * field in @p aInfo MUST be set to zero.
+ *
+ * Here is an example of the generated hex dump output:
+ *
+ *  "==========================[{mTitle} len=070]============================"
+ *  "| 41 D8 87 34 12 FF FF 25 | 4C 57 DA F2 FB 2F 62 7F | A..4...%LW.../b. |"
+ *  "| 3B 01 F0 4D 4C 4D 4C 54 | 4F 00 15 15 00 00 00 00 | ;..MLMLTO....... |"
+ *  "| 00 00 00 01 80 DB 60 82 | 7E 33 72 3B CC B3 A1 84 | ......`.~3r;.... |"
+ *  "| 3B E6 AD B2 0B 45 E7 45 | C5 B9 00 1A CB 2D 6D 1C | ;....E.E.....-m. |"
+ *  "| 10 3E 3C F5 D3 70       |                         | .><..p           |"
+ *  "------------------------------------------------------------------------"
+ *
+ * @param[in,out] aInfo    A reference to a `LogHexDumpInfo` to use to generate hex dump.
+ *
+ * @retval kErrorNone      Successfully generated the next line, `mLine` field in @p aInfo is updated.
+ * @retval kErrorNotFound  Reached the end and no more line to generate.
+ *
+ */
+Error GenerateNextHexDumpLine(HexDumpInfo &aInfo);
 
 } // namespace ot
 

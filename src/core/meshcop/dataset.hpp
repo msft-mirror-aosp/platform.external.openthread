@@ -53,7 +53,7 @@ namespace ot {
 namespace MeshCoP {
 
 /**
- * This class represents MeshCop Dataset.
+ * Represents MeshCop Dataset.
  *
  */
 class Dataset
@@ -66,7 +66,7 @@ public:
     static constexpr uint8_t kMaxGetTypes  = 64;                                ///< Max number of types in MGMT_GET.req
 
     /**
-     * This enumeration represents the Dataset type (active or pending).
+     * Represents the Dataset type (active or pending).
      *
      */
     enum Type : uint8_t
@@ -76,14 +76,14 @@ public:
     };
 
     /**
-     * This class represents presence of different components in Active or Pending Operational Dataset.
+     * Represents presence of different components in Active or Pending Operational Dataset.
      *
      */
     class Components : public otOperationalDatasetComponents, public Clearable<Components>
     {
     public:
         /**
-         * This method indicates whether or not the Active Timestamp is present in the Dataset.
+         * Indicates whether or not the Active Timestamp is present in the Dataset.
          *
          * @returns TRUE if Active Timestamp is present, FALSE otherwise.
          *
@@ -91,7 +91,7 @@ public:
         bool IsActiveTimestampPresent(void) const { return mIsActiveTimestampPresent; }
 
         /**
-         * This method indicates whether or not the Pending Timestamp is present in the Dataset.
+         * Indicates whether or not the Pending Timestamp is present in the Dataset.
          *
          * @returns TRUE if Pending Timestamp is present, FALSE otherwise.
          *
@@ -99,7 +99,7 @@ public:
         bool IsPendingTimestampPresent(void) const { return mIsPendingTimestampPresent; }
 
         /**
-         * This method indicates whether or not the Network Key is present in the Dataset.
+         * Indicates whether or not the Network Key is present in the Dataset.
          *
          * @returns TRUE if Network Key is present, FALSE otherwise.
          *
@@ -107,7 +107,7 @@ public:
         bool IsNetworkKeyPresent(void) const { return mIsNetworkKeyPresent; }
 
         /**
-         * This method indicates whether or not the Network Name is present in the Dataset.
+         * Indicates whether or not the Network Name is present in the Dataset.
          *
          * @returns TRUE if Network Name is present, FALSE otherwise.
          *
@@ -115,7 +115,7 @@ public:
         bool IsNetworkNamePresent(void) const { return mIsNetworkNamePresent; }
 
         /**
-         * This method indicates whether or not the Extended PAN ID is present in the Dataset.
+         * Indicates whether or not the Extended PAN ID is present in the Dataset.
          *
          * @returns TRUE if Extended PAN ID is present, FALSE otherwise.
          *
@@ -123,7 +123,7 @@ public:
         bool IsExtendedPanIdPresent(void) const { return mIsExtendedPanIdPresent; }
 
         /**
-         * This method indicates whether or not the Mesh Local Prefix is present in the Dataset.
+         * Indicates whether or not the Mesh Local Prefix is present in the Dataset.
          *
          * @returns TRUE if Mesh Local Prefix is present, FALSE otherwise.
          *
@@ -131,7 +131,7 @@ public:
         bool IsMeshLocalPrefixPresent(void) const { return mIsMeshLocalPrefixPresent; }
 
         /**
-         * This method indicates whether or not the Delay Timer is present in the Dataset.
+         * Indicates whether or not the Delay Timer is present in the Dataset.
          *
          * @returns TRUE if Delay Timer is present, FALSE otherwise.
          *
@@ -139,7 +139,7 @@ public:
         bool IsDelayPresent(void) const { return mIsDelayPresent; }
 
         /**
-         * This method indicates whether or not the PAN ID is present in the Dataset.
+         * Indicates whether or not the PAN ID is present in the Dataset.
          *
          * @returns TRUE if PAN ID is present, FALSE otherwise.
          *
@@ -147,7 +147,7 @@ public:
         bool IsPanIdPresent(void) const { return mIsPanIdPresent; }
 
         /**
-         * This method indicates whether or not the Channel is present in the Dataset.
+         * Indicates whether or not the Channel is present in the Dataset.
          *
          * @returns TRUE if Channel is present, FALSE otherwise.
          *
@@ -155,7 +155,7 @@ public:
         bool IsChannelPresent(void) const { return mIsChannelPresent; }
 
         /**
-         * This method indicates whether or not the PSKc is present in the Dataset.
+         * Indicates whether or not the PSKc is present in the Dataset.
          *
          * @returns TRUE if PSKc is present, FALSE otherwise.
          *
@@ -163,7 +163,7 @@ public:
         bool IsPskcPresent(void) const { return mIsPskcPresent; }
 
         /**
-         * This method indicates whether or not the Security Policy is present in the Dataset.
+         * Indicates whether or not the Security Policy is present in the Dataset.
          *
          * @returns TRUE if Security Policy is present, FALSE otherwise.
          *
@@ -171,7 +171,7 @@ public:
         bool IsSecurityPolicyPresent(void) const { return mIsSecurityPolicyPresent; }
 
         /**
-         * This method indicates whether or not the Channel Mask is present in the Dataset.
+         * Indicates whether or not the Channel Mask is present in the Dataset.
          *
          * @returns TRUE if Channel Mask is present, FALSE otherwise.
          *
@@ -180,14 +180,14 @@ public:
     };
 
     /**
-     * This type represents the information about the fields contained an Active or Pending Operational Dataset.
+     * Represents the information about the fields contained an Active or Pending Operational Dataset.
      *
      */
     class Info : public otOperationalDataset, public Clearable<Info>
     {
     public:
         /**
-         * This method indicates whether or not the Active Timestamp is present in the Dataset.
+         * Indicates whether or not the Active Timestamp is present in the Dataset.
          *
          * @returns TRUE if Active Timestamp is present, FALSE otherwise.
          *
@@ -195,18 +195,18 @@ public:
         bool IsActiveTimestampPresent(void) const { return mComponents.mIsActiveTimestampPresent; }
 
         /**
-         * This method gets the Active Timestamp in the Dataset.
+         * Gets the Active Timestamp in the Dataset.
          *
-         * This method MUST be used when Active Timestamp component is present in the Dataset, otherwise its behavior is
+         * MUST be used when Active Timestamp component is present in the Dataset, otherwise its behavior is
          * undefined.
          *
-         * @returns The Active Timestamp in the Dataset.
+         * @param[out] aTimestamp  A reference to output the Active Timestamp in the Dataset.
          *
          */
         void GetActiveTimestamp(Timestamp &aTimestamp) const { aTimestamp.SetFromTimestamp(mActiveTimestamp); }
 
         /**
-         * This method sets the Active Timestamp in the Dataset.
+         * Sets the Active Timestamp in the Dataset.
          *
          * @param[in] aTimestamp   A Timestamp value.
          *
@@ -218,7 +218,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the Pending Timestamp is present in the Dataset.
+         * Indicates whether or not the Pending Timestamp is present in the Dataset.
          *
          * @returns TRUE if Pending Timestamp is present, FALSE otherwise.
          *
@@ -226,18 +226,18 @@ public:
         bool IsPendingTimestampPresent(void) const { return mComponents.mIsPendingTimestampPresent; }
 
         /**
-         * This method gets the Pending Timestamp in the Dataset.
+         * Gets the Pending Timestamp in the Dataset.
          *
-         * This method MUST be used when Pending Timestamp component is present in the Dataset, otherwise its behavior
+         * MUST be used when Pending Timestamp component is present in the Dataset, otherwise its behavior
          * is undefined.
          *
-         * @returns The Pending Timestamp in the Dataset.
+         * @param[out] aTimestamp  A reference to output the Pending Timestamp in the Dataset.
          *
          */
         void GetPendingTimestamp(Timestamp &aTimestamp) const { aTimestamp.SetFromTimestamp(mPendingTimestamp); }
 
         /**
-         * This method sets the Pending Timestamp in the Dataset.
+         * Sets the Pending Timestamp in the Dataset.
          *
          * @param[in] aTimestamp   A Timestamp value.
          *
@@ -249,7 +249,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the Network Key is present in the Dataset.
+         * Indicates whether or not the Network Key is present in the Dataset.
          *
          * @returns TRUE if Network Key is present, FALSE otherwise.
          *
@@ -257,9 +257,9 @@ public:
         bool IsNetworkKeyPresent(void) const { return mComponents.mIsNetworkKeyPresent; }
 
         /**
-         * This method gets the Network Key in the Dataset.
+         * Gets the Network Key in the Dataset.
          *
-         * This method MUST be used when Network Key component is present in the Dataset, otherwise its behavior
+         * MUST be used when Network Key component is present in the Dataset, otherwise its behavior
          * is undefined.
          *
          * @returns The Network Key in the Dataset.
@@ -268,7 +268,7 @@ public:
         const NetworkKey &GetNetworkKey(void) const { return AsCoreType(&mNetworkKey); }
 
         /**
-         * This method sets the Network Key in the Dataset.
+         * Sets the Network Key in the Dataset.
          *
          * @param[in] aNetworkKey  A Network Key.
          *
@@ -280,7 +280,7 @@ public:
         }
 
         /**
-         * This method returns a reference to the Network Key in the Dataset to be updated by caller.
+         * Returns a reference to the Network Key in the Dataset to be updated by caller.
          *
          * @returns A reference to the Network Key in the Dataset.
          *
@@ -292,7 +292,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the Network Name is present in the Dataset.
+         * Indicates whether or not the Network Name is present in the Dataset.
          *
          * @returns TRUE if Network Name is present, FALSE otherwise.
          *
@@ -300,9 +300,9 @@ public:
         bool IsNetworkNamePresent(void) const { return mComponents.mIsNetworkNamePresent; }
 
         /**
-         * This method gets the Network Name in the Dataset.
+         * Gets the Network Name in the Dataset.
          *
-         * This method MUST be used when Network Name component is present in the Dataset, otherwise its behavior is
+         * MUST be used when Network Name component is present in the Dataset, otherwise its behavior is
          * undefined.
          *
          * @returns The Network Name in the Dataset.
@@ -311,7 +311,7 @@ public:
         const NetworkName &GetNetworkName(void) const { return AsCoreType(&mNetworkName); }
 
         /**
-         * This method sets the Network Name in the Dataset.
+         * Sets the Network Name in the Dataset.
          *
          * @param[in] aNetworkNameData   A Network Name Data.
          *
@@ -323,7 +323,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the Extended PAN ID is present in the Dataset.
+         * Indicates whether or not the Extended PAN ID is present in the Dataset.
          *
          * @returns TRUE if Extended PAN ID is present, FALSE otherwise.
          *
@@ -331,9 +331,9 @@ public:
         bool IsExtendedPanIdPresent(void) const { return mComponents.mIsExtendedPanIdPresent; }
 
         /**
-         * This method gets the Extended PAN ID in the Dataset.
+         * Gets the Extended PAN ID in the Dataset.
          *
-         * This method MUST be used when Extended PAN ID component is present in the Dataset, otherwise its behavior is
+         * MUST be used when Extended PAN ID component is present in the Dataset, otherwise its behavior is
          * undefined.
          *
          * @returns The Extended PAN ID in the Dataset.
@@ -342,7 +342,7 @@ public:
         const ExtendedPanId &GetExtendedPanId(void) const { return AsCoreType(&mExtendedPanId); }
 
         /**
-         * This method sets the Extended PAN ID in the Dataset.
+         * Sets the Extended PAN ID in the Dataset.
          *
          * @param[in] aExtendedPanId   An Extended PAN ID.
          *
@@ -354,7 +354,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the Mesh Local Prefix is present in the Dataset.
+         * Indicates whether or not the Mesh Local Prefix is present in the Dataset.
          *
          * @returns TRUE if Mesh Local Prefix is present, FALSE otherwise.
          *
@@ -362,9 +362,9 @@ public:
         bool IsMeshLocalPrefixPresent(void) const { return mComponents.mIsMeshLocalPrefixPresent; }
 
         /**
-         * This method gets the Mesh Local Prefix in the Dataset.
+         * Gets the Mesh Local Prefix in the Dataset.
          *
-         * This method MUST be used when Mesh Local Prefix component is present in the Dataset, otherwise its behavior
+         * MUST be used when Mesh Local Prefix component is present in the Dataset, otherwise its behavior
          * is undefined.
          *
          * @returns The Mesh Local Prefix in the Dataset.
@@ -376,7 +376,7 @@ public:
         }
 
         /**
-         * This method sets the Mesh Local Prefix in the Dataset.
+         * Sets the Mesh Local Prefix in the Dataset.
          *
          * @param[in] aMeshLocalPrefix   A Mesh Local Prefix.
          *
@@ -388,7 +388,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the Delay Timer is present in the Dataset.
+         * Indicates whether or not the Delay Timer is present in the Dataset.
          *
          * @returns TRUE if Delay Timer is present, FALSE otherwise.
          *
@@ -396,9 +396,9 @@ public:
         bool IsDelayPresent(void) const { return mComponents.mIsDelayPresent; }
 
         /**
-         * This method gets the Delay Timer in the Dataset.
+         * Gets the Delay Timer in the Dataset.
          *
-         * This method MUST be used when Delay Timer component is present in the Dataset, otherwise its behavior is
+         * MUST be used when Delay Timer component is present in the Dataset, otherwise its behavior is
          * undefined.
          *
          * @returns The Delay Timer in the Dataset.
@@ -407,7 +407,7 @@ public:
         uint32_t GetDelay(void) const { return mDelay; }
 
         /**
-         * This method sets the Delay Timer in the Dataset.
+         * Sets the Delay Timer in the Dataset.
          *
          * @param[in] aDelay  A Delay value.
          *
@@ -419,7 +419,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the PAN ID is present in the Dataset.
+         * Indicates whether or not the PAN ID is present in the Dataset.
          *
          * @returns TRUE if PAN ID is present, FALSE otherwise.
          *
@@ -427,9 +427,9 @@ public:
         bool IsPanIdPresent(void) const { return mComponents.mIsPanIdPresent; }
 
         /**
-         * This method gets the PAN ID in the Dataset.
+         * Gets the PAN ID in the Dataset.
          *
-         * This method MUST be used when PAN ID component is present in the Dataset, otherwise its behavior is
+         * MUST be used when PAN ID component is present in the Dataset, otherwise its behavior is
          * undefined.
          *
          * @returns The PAN ID in the Dataset.
@@ -438,7 +438,7 @@ public:
         Mac::PanId GetPanId(void) const { return mPanId; }
 
         /**
-         * This method sets the PAN ID in the Dataset.
+         * Sets the PAN ID in the Dataset.
          *
          * @param[in] aPanId  A PAN ID.
          *
@@ -450,7 +450,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the Channel is present in the Dataset.
+         * Indicates whether or not the Channel is present in the Dataset.
          *
          * @returns TRUE if Channel is present, FALSE otherwise.
          *
@@ -458,9 +458,9 @@ public:
         bool IsChannelPresent(void) const { return mComponents.mIsChannelPresent; }
 
         /**
-         * This method gets the Channel in the Dataset.
+         * Gets the Channel in the Dataset.
          *
-         * This method MUST be used when Channel component is present in the Dataset, otherwise its behavior is
+         * MUST be used when Channel component is present in the Dataset, otherwise its behavior is
          * undefined.
          *
          * @returns The Channel in the Dataset.
@@ -469,7 +469,7 @@ public:
         uint16_t GetChannel(void) const { return mChannel; }
 
         /**
-         * This method sets the Channel in the Dataset.
+         * Sets the Channel in the Dataset.
          *
          * @param[in] aChannel  A Channel.
          *
@@ -481,7 +481,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the PSKc is present in the Dataset.
+         * Indicates whether or not the PSKc is present in the Dataset.
          *
          * @returns TRUE if PSKc is present, FALSE otherwise.
          *
@@ -489,9 +489,9 @@ public:
         bool IsPskcPresent(void) const { return mComponents.mIsPskcPresent; }
 
         /**
-         * This method gets the PSKc in the Dataset.
+         * Gets the PSKc in the Dataset.
          *
-         * This method MUST be used when PSKc component is present in the Dataset, otherwise its behavior is undefined.
+         * MUST be used when PSKc component is present in the Dataset, otherwise its behavior is undefined.
          *
          * @returns The PSKc in the Dataset.
          *
@@ -499,7 +499,7 @@ public:
         const Pskc &GetPskc(void) const { return AsCoreType(&mPskc); }
 
         /**
-         * This method set the PSKc in the Dataset.
+         * Set the PSKc in the Dataset.
          *
          * @param[in] aPskc  A PSKc value.
          *
@@ -511,7 +511,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the Security Policy is present in the Dataset.
+         * Indicates whether or not the Security Policy is present in the Dataset.
          *
          * @returns TRUE if Security Policy is present, FALSE otherwise.
          *
@@ -519,9 +519,9 @@ public:
         bool IsSecurityPolicyPresent(void) const { return mComponents.mIsSecurityPolicyPresent; }
 
         /**
-         * This method gets the Security Policy in the Dataset.
+         * Gets the Security Policy in the Dataset.
          *
-         * This method MUST be used when Security Policy component is present in the Dataset, otherwise its behavior is
+         * MUST be used when Security Policy component is present in the Dataset, otherwise its behavior is
          * undefined.
          *
          * @returns The Security Policy in the Dataset.
@@ -530,7 +530,7 @@ public:
         const SecurityPolicy &GetSecurityPolicy(void) const { return AsCoreType(&mSecurityPolicy); }
 
         /**
-         * This method sets the Security Policy in the Dataset.
+         * Sets the Security Policy in the Dataset.
          *
          * @param[in] aSecurityPolicy  A Security Policy to set in Dataset.
          *
@@ -542,7 +542,7 @@ public:
         }
 
         /**
-         * This method indicates whether or not the Channel Mask is present in the Dataset.
+         * Indicates whether or not the Channel Mask is present in the Dataset.
          *
          * @returns TRUE if Channel Mask is present, FALSE otherwise.
          *
@@ -550,9 +550,9 @@ public:
         bool IsChannelMaskPresent(void) const { return mComponents.mIsChannelMaskPresent; }
 
         /**
-         * This method gets the Channel Mask in the Dataset.
+         * Gets the Channel Mask in the Dataset.
          *
-         * This method MUST be used when Channel Mask component is present in the Dataset, otherwise its behavior is
+         * MUST be used when Channel Mask component is present in the Dataset, otherwise its behavior is
          * undefined.
          *
          * @returns The Channel Mask in the Dataset.
@@ -561,7 +561,7 @@ public:
         otChannelMask GetChannelMask(void) const { return mChannelMask; }
 
         /**
-         * This method sets the Channel Mask in the Dataset.
+         * Sets the Channel Mask in the Dataset.
          *
          * @param[in] aChannelMask   A Channel Mask value.
          *
@@ -573,7 +573,7 @@ public:
         }
 
         /**
-         * This method populates the Dataset with random fields.
+         * Populates the Dataset with random fields.
          *
          * The Network Key, PSKc, Mesh Local Prefix, PAN ID, and Extended PAN ID are generated randomly (crypto-secure)
          * with Network Name set to "OpenThread-%04x" with PAN ID appended as hex. The Channel is chosen randomly from
@@ -588,7 +588,7 @@ public:
         Error GenerateRandom(Instance &aInstance);
 
         /**
-         * This method checks whether the Dataset is a subset of another one, i.e., all the components in the current
+         * Checks whether the Dataset is a subset of another one, i.e., all the components in the current
          * Dataset are also present in the @p aOther and the component values fully match.
          *
          * The matching of components in the two Datasets excludes Active/Pending Timestamp and Delay components.
@@ -603,19 +603,19 @@ public:
     };
 
     /**
-     * This constructor initializes the object.
+     * Initializes the object.
      *
      */
     Dataset(void);
 
     /**
-     * This method clears the Dataset.
+     * Clears the Dataset.
      *
      */
     void Clear(void);
 
     /**
-     * This method indicates whether or not the dataset appears to be well-formed.
+     * Indicates whether or not the dataset appears to be well-formed.
      *
      * @returns TRUE if the dataset appears to be well-formed, FALSE otherwise.
      *
@@ -623,49 +623,128 @@ public:
     bool IsValid(void) const;
 
     /**
-     * This method returns a pointer to the TLV with a given type.
+     * Indicates whether or not a given TLV type is present in the Dataset.
      *
-     * @param[in] aType  A TLV type.
+     * @param[in] aType  The TLV type to check.
      *
-     * @returns A pointer to the TLV or `nullptr` if none is found.
+     * @retval TRUE    TLV with @p aType is present in the Dataset.
+     * @retval FALSE   TLV with @p aType is not present in the Dataset.
      *
      */
-    Tlv *GetTlv(Tlv::Type aType) { return AsNonConst(AsConst(this)->GetTlv(aType)); }
+    bool ContainsTlv(Tlv::Type aType) const { return (FindTlv(aType) != nullptr); }
 
     /**
-     * This method returns a pointer to the TLV with a given type.
+     * Indicates whether or not a given TLV type is present in the Dataset.
      *
-     * @param[in] aType  The TLV type.
+     * @tparam  aTlvType  The TLV type to check.
      *
-     * @returns A pointer to the TLV or `nullptr` if none is found.
-     *
-     */
-    const Tlv *GetTlv(Tlv::Type aType) const;
-
-    /**
-     * This template method returns a pointer to the TLV with a given template type `TlvType`
-     *
-     * @returns A pointer to the TLV or `nullptr` if none is found.
+     * @retval TRUE    TLV of @p aTlvType is present in the Dataset.
+     * @retval FALSE   TLV of @p aTlvType is not present in the Dataset.
      *
      */
-    template <typename TlvType> TlvType *GetTlv(void)
+    template <typename TlvType> bool Contains(void) const
     {
-        return As<TlvType>(GetTlv(static_cast<Tlv::Type>(TlvType::kType)));
+        return ContainsTlv(static_cast<Tlv::Type>(TlvType::kType));
     }
 
     /**
-     * This template method returns a pointer to the TLV with a given template type `TlvType`
+     * Searches for a given TLV type in the Dataset.
      *
-     * @returns A pointer to the TLV or `nullptr` if none is found.
+     * @param[in] aType  The TLV type to find.
+     *
+     * @returns A pointer to the TLV or `nullptr` if not found.
      *
      */
-    template <typename TlvType> const TlvType *GetTlv(void) const
+    Tlv *FindTlv(Tlv::Type aType) { return AsNonConst(AsConst(this)->FindTlv(aType)); }
+
+    /**
+     * Searches for a given TLV type in the Dataset.
+     *
+     * @param[in] aType  The TLV type to find.
+     *
+     * @returns A pointer to the TLV or `nullptr` if not found.
+     *
+     */
+    const Tlv *FindTlv(Tlv::Type aType) const;
+
+    /**
+     * Writes a TLV to the Dataset.
+     *
+     * If the specified TLV type already exists, it will be replaced. Otherwise, the TLV will be appended.
+     *
+     * @param[in] aTlv     A reference to the TLV.
+     *
+     * @retval kErrorNone    Successfully updated the TLV.
+     * @retval kErrorNoBufs  Could not add the TLV due to insufficient buffer space.
+     *
+     */
+    Error WriteTlv(const Tlv &aTlv);
+
+    /**
+     * Writes a TLV in the Dataset.
+     *
+     * If the specified TLV type already exists, it will be replaced. Otherwise, the TLV will be appended.
+     *
+     * @param[in]  aType     The TLV type.
+     * @param[in]  aValue    A pointer to a buffer containing the TLV value.
+     * @param[in]  aLength   The TLV length.
+     *
+     * @retval kErrorNone    Successfully updated the TLV.
+     * @retval kErrorNoBufs  Could not add the TLV due to insufficient buffer space.
+     *
+     */
+    Error WriteTlv(Tlv::Type aType, const void *aValue, uint8_t aLength);
+
+    /**
+     * Writes a simple TLV in the Dataset.
+     *
+     * If the specified TLV type already exists, it will be replaced. Otherwise, the TLV will be appended.
+     *
+     * @tparam  SimpleTlvType   The simple TLV type (must be a sub-class of `SimpleTlvInfo`).
+     *
+     * @param[in] aValue   The TLV value.
+     *
+     * @retval kErrorNone    Successfully updated the TLV.
+     * @retval kErrorNoBufs  Could not add the TLV due to insufficient buffer space.
+     *
+     */
+    template <typename SimpleTlvType> Error Write(const typename SimpleTlvType::ValueType &aValue)
     {
-        return As<TlvType>(GetTlv(static_cast<Tlv::Type>(TlvType::kType)));
+        return WriteTlv(static_cast<Tlv::Type>(SimpleTlvType::kType), &aValue, sizeof(aValue));
     }
 
     /**
-     * This method returns a pointer to the byte representation of the Dataset.
+     * Writes a `uint` TLV in the Dataset.
+     *
+     * If the specified TLV type already exists, it will be replaced. Otherwise, the TLV will be appended.
+     *
+     * @tparam  UintTlvType     The integer simple TLV type (must be a sub-class of `UintTlvInfo`).
+     *
+     * @param[in]  aValue   The TLV value.
+     *
+     * @retval kErrorNone    Successfully updated the TLV.
+     * @retval kErrorNoBufs  Could not add the TLV due to insufficient buffer space.
+     *
+     */
+    template <typename UintTlvType> Error Write(typename UintTlvType::UintValueType aValue)
+    {
+        typename UintTlvType::UintValueType value = BigEndian::HostSwap(aValue);
+
+        return WriteTlv(static_cast<Tlv::Type>(UintTlvType::kType), &value, sizeof(value));
+    }
+
+    /**
+     * Removes a TLV from the Dataset.
+     *
+     * If the Dataset does not contain the given TLV type, no action is performed.
+     *
+     * @param[in] aType  The TLV type to remove.
+     *
+     */
+    void RemoveTlv(Tlv::Type aType);
+
+    /**
+     * Returns a pointer to the byte representation of the Dataset.
      *
      * @returns A pointer to the byte representation of the Dataset.
      *
@@ -673,7 +752,7 @@ public:
     uint8_t *GetBytes(void) { return mTlvs; }
 
     /**
-     * This method returns a pointer to the byte representation of the Dataset.
+     * Returns a pointer to the byte representation of the Dataset.
      *
      * @returns A pointer to the byte representation of the Dataset.
      *
@@ -681,7 +760,7 @@ public:
     const uint8_t *GetBytes(void) const { return mTlvs; }
 
     /**
-     * This method converts the TLV representation to structure representation.
+     * Converts the TLV representation to structure representation.
      *
      * @param[out] aDatasetInfo  A reference to `Info` object to output the Dataset.
      *
@@ -689,7 +768,7 @@ public:
     void ConvertTo(Info &aDatasetInfo) const;
 
     /**
-     * This method converts the TLV representation to structure representation.
+     * Converts the TLV representation to structure representation.
      *
      * @param[out] aDataset  A reference to `otOperationalDatasetTlvs` to output the Dataset.
      *
@@ -697,7 +776,7 @@ public:
     void ConvertTo(otOperationalDatasetTlvs &aDataset) const;
 
     /**
-     * This method returns the Dataset size in bytes.
+     * Returns the Dataset size in bytes.
      *
      * @returns The Dataset size in bytes.
      *
@@ -705,7 +784,7 @@ public:
     uint16_t GetSize(void) const { return mLength; }
 
     /**
-     * This method sets the Dataset size in bytes.
+     * Sets the Dataset size in bytes.
      *
      * @param[in] aSize  The Dataset size in bytes.
      *
@@ -713,7 +792,7 @@ public:
     void SetSize(uint16_t aSize) { mLength = aSize; }
 
     /**
-     * This method returns the local time the dataset was last updated.
+     * Returns the local time the dataset was last updated.
      *
      * @returns The local time the dataset was last updated.
      *
@@ -721,7 +800,7 @@ public:
     TimeMilli GetUpdateTime(void) const { return mUpdateTime; }
 
     /**
-     * This method gets the Timestamp (Active or Pending).
+     * Gets the Timestamp (Active or Pending).
      *
      * @param[in]  aType       The type: active or pending.
      * @param[out] aTimestamp  A reference to a `Timestamp` to output the value.
@@ -733,7 +812,7 @@ public:
     Error GetTimestamp(Type aType, Timestamp &aTimestamp) const;
 
     /**
-     * This method sets the Timestamp value.
+     * Sets the Timestamp value.
      *
      * @param[in] aType        The type: active or pending.
      * @param[in] aTimestamp   A Timestamp.
@@ -742,50 +821,7 @@ public:
     void SetTimestamp(Type aType, const Timestamp &aTimestamp);
 
     /**
-     * This method sets a TLV in the Dataset.
-     *
-     * @param[in]  aTlv  A reference to the TLV.
-     *
-     * @retval kErrorNone    Successfully set the TLV.
-     * @retval kErrorNoBufs  Could not set the TLV due to insufficient buffer space.
-     *
-     */
-    Error SetTlv(const Tlv &aTlv);
-
-    /**
-     * This method sets a TLV with a given TLV Type and Value.
-     *
-     * @param[in] aType     The TLV Type.
-     * @param[in] aValue    A pointer to TLV Value.
-     * @param[in] aLength   The TLV Length in bytes (length of @p aValue).
-     *
-     * @retval kErrorNone    Successfully set the TLV.
-     * @retval kErrorNoBufs  Could not set the TLV due to insufficient buffer space.
-     *
-     */
-    Error SetTlv(Tlv::Type aType, const void *aValue, uint8_t aLength);
-
-    /**
-     * This template method sets a TLV with a given TLV Type and Value.
-     *
-     * @tparam ValueType    The type of TLV's Value.
-     *
-     * @param[in] aType     The TLV Type.
-     * @param[in] aValue    The TLV Value (of type `ValueType`).
-     *
-     * @retval kErrorNone    Successfully set the TLV.
-     * @retval kErrorNoBufs  Could not set the TLV due to insufficient buffer space.
-     *
-     */
-    template <typename ValueType> Error SetTlv(Tlv::Type aType, const ValueType &aValue)
-    {
-        static_assert(!TypeTraits::IsPointer<ValueType>::kValue, "ValueType must not be a pointer");
-
-        return SetTlv(aType, &aValue, sizeof(ValueType));
-    }
-
-    /**
-     * This method reads the Dataset from a given message and checks that it is well-formed and valid.
+     * Reads the Dataset from a given message and checks that it is well-formed and valid.
      *
      * @param[in]  aMessage  The message to read from.
      * @param[in]  aOffset   The offset in @p aMessage to start reading the Dataset TLVs.
@@ -798,7 +834,7 @@ public:
     Error ReadFromMessage(const Message &aMessage, uint16_t aOffset, uint16_t aLength);
 
     /**
-     * This method sets the Dataset using an existing Dataset.
+     * Sets the Dataset using an existing Dataset.
      *
      * If this Dataset is an Active Dataset, any Pending Timestamp and Delay Timer TLVs will be omitted in the copy
      * from @p aDataset.
@@ -810,7 +846,7 @@ public:
     void Set(Type aType, const Dataset &aDataset);
 
     /**
-     * This method sets the Dataset from a given structure representation.
+     * Sets the Dataset from a given structure representation.
      *
      * @param[in]  aDatasetInfo  The input Dataset as `Dataset::Info`.
      *
@@ -821,7 +857,7 @@ public:
     Error SetFrom(const Info &aDatasetInfo);
 
     /**
-     * This method sets the Dataset using @p aDataset.
+     * Sets the Dataset using @p aDataset.
      *
      * @param[in]  aDataset  The input Dataset as otOperationalDatasetTlvs.
      *
@@ -829,15 +865,7 @@ public:
     void SetFrom(const otOperationalDatasetTlvs &aDataset);
 
     /**
-     * This method removes a TLV from the Dataset.
-     *
-     * @param[in] aType The type of a specific TLV.
-     *
-     */
-    void RemoveTlv(Tlv::Type aType);
-
-    /**
-     * This method appends the MLE Dataset TLV but excluding MeshCoP Sub Timestamp TLV.
+     * Appends the MLE Dataset TLV but excluding MeshCoP Sub Timestamp TLV.
      *
      * @param[in] aType          The type of the dataset, active or pending.
      * @param[in] aMessage       A message to append to.
@@ -849,7 +877,7 @@ public:
     Error AppendMleDatasetTlv(Type aType, Message &aMessage) const;
 
     /**
-     * This method applies the Active or Pending Dataset to the Thread interface.
+     * Applies the Active or Pending Dataset to the Thread interface.
      *
      * @param[in]  aInstance            A reference to the OpenThread instance.
      * @param[out] aIsNetworkKeyUpdated A pointer to where to place whether network key was updated.
@@ -861,15 +889,15 @@ public:
     Error ApplyConfiguration(Instance &aInstance, bool *aIsNetworkKeyUpdated = nullptr) const;
 
     /**
-     * This method converts a Pending Dataset to an Active Dataset.
+     * Converts a Pending Dataset to an Active Dataset.
      *
-     * This method removes the Delay Timer and Pending Timestamp TLVs
+     * Removes the Delay Timer and Pending Timestamp TLVs
      *
      */
     void ConvertToActive(void);
 
     /**
-     * This method returns a pointer to the start of Dataset TLVs sequence.
+     * Returns a pointer to the start of Dataset TLVs sequence.
      *
      * @return  A pointer to the start of Dataset TLVs sequence.
      *
@@ -877,7 +905,7 @@ public:
     Tlv *GetTlvsStart(void) { return reinterpret_cast<Tlv *>(mTlvs); }
 
     /**
-     * This method returns a pointer to the start of Dataset TLVs sequence.
+     * Returns a pointer to the start of Dataset TLVs sequence.
      *
      * @return  A pointer to start of Dataset TLVs sequence.
      *
@@ -885,7 +913,7 @@ public:
     const Tlv *GetTlvsStart(void) const { return reinterpret_cast<const Tlv *>(mTlvs); }
 
     /**
-     * This method returns a pointer to the past-the-end of Dataset TLVs sequence.
+     * Returns a pointer to the past-the-end of Dataset TLVs sequence.
      *
      * Note that past-the-end points to the byte after the end of the last TLV in Dataset TLVs sequence.
      *
@@ -895,7 +923,7 @@ public:
     Tlv *GetTlvsEnd(void) { return reinterpret_cast<Tlv *>(mTlvs + mLength); }
 
     /**
-     * This method returns a pointer to the past-the-end of Dataset TLVs sequence.
+     * Returns a pointer to the past-the-end of Dataset TLVs sequence.
      *
      * Note that past-the-end points to the byte after the end of the last TLV in Dataset TLVs sequence.
      *
@@ -905,12 +933,41 @@ public:
     const Tlv *GetTlvsEnd(void) const { return reinterpret_cast<const Tlv *>(mTlvs + mLength); }
 
     /**
-     * This static method converts a Dataset Type to a string.
+     * Converts a Dataset Type to a string.
      *
      * @param[in]  aType   A Dataset type.
      *
      */
     static const char *TypeToString(Type aType);
+
+#if OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE
+
+    /**
+     * Saves a given TLV value in secure storage and clears the TLV value by setting all value bytes to zero.
+     *
+     * If the Dataset does not contain the @p aTlvType, no action is performed.
+     *
+     * @param[in] aTlvType    The TLV type.
+     * @param[in] aKeyRef     The `KeyRef` to use with secure storage.
+     *
+     */
+    void SaveTlvInSecureStorageAndClearValue(Tlv::Type aTlvType, Crypto::Storage::KeyRef aKeyRef);
+
+    /**
+     * Reads and updates a given TLV value in Dataset from secure storage.
+     *
+     * If the Dataset does not contain the @p aTlvType, no action is performed and `kErrorNone` is returned.
+     *
+     * @param[in] aTlvType    The TLV type.
+     * @param[in] aKeyRef     The `KeyRef` to use with secure storage.
+     *
+     * @retval kErrorNone    Successfully read the TLV value from secure storage and updated the Dataset.
+     * @retval KErrorFailed  Could not read the @aKeyRef from secure storage.
+     *
+     */
+    Error ReadTlvFromSecureStorage(Tlv::Type aTlvType, Crypto::Storage::KeyRef aKeyRef);
+
+#endif // OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE
 
 private:
     void RemoveTlv(Tlv *aTlv);
@@ -919,40 +976,6 @@ private:
     TimeMilli mUpdateTime;     ///< Local time last updated
     uint16_t  mLength;         ///< The number of valid bytes in @var mTlvs
 };
-
-/**
- * This is a template specialization of `SetTlv<ValueType>` with a `uint16_t` value type.
- *
- * @param[in] aType     The TLV Type.
- * @param[in] aValue    The TLV value (as `uint16_t`).
- *
- * @retval kErrorNone    Successfully set the TLV.
- * @retval kErrorNoBufs  Could not set the TLV due to insufficient buffer space.
- *
- */
-template <> inline Error Dataset::SetTlv(Tlv::Type aType, const uint16_t &aValue)
-{
-    uint16_t value = Encoding::BigEndian::HostSwap16(aValue);
-
-    return SetTlv(aType, &value, sizeof(uint16_t));
-}
-
-/**
- * This is a template specialization of `SetTlv<ValueType>` with a `uint32_t` value type
- *
- * @param[in] aType     The TLV Type.
- * @param[in] aValue    The TLV value (as `uint32_t`).
- *
- * @retval kErrorNone    Successfully set the TLV.
- * @retval kErrorNoBufs  Could not set the TLV due to insufficient buffer space.
- *
- */
-template <> inline Error Dataset::SetTlv(Tlv::Type aType, const uint32_t &aValue)
-{
-    uint32_t value = Encoding::BigEndian::HostSwap32(aValue);
-
-    return SetTlv(aType, &value, sizeof(uint32_t));
-}
 
 } // namespace MeshCoP
 

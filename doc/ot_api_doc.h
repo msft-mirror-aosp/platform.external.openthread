@@ -142,6 +142,7 @@
  * @defgroup api-mesh-diag            Mesh Diagnostics
  * @defgroup api-ncp                  Network Co-Processor
  * @defgroup api-network-time         Network Time Synchronization
+ * @defgroup api-radio                Radio Statistics
  * @defgroup api-random-group         Random Number Generator
  *
  * @{
@@ -175,6 +176,7 @@
  * @defgroup plat-memory              Memory
  * @defgroup plat-messagepool         Message Pool
  * @defgroup plat-misc                Miscellaneous
+ * @defgroup plat-multipan            Multipan
  * @defgroup plat-otns                Network Simulator
  * @defgroup plat-radio               Radio
  * @defgroup plat-settings            Settings
