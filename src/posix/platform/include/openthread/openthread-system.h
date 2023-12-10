@@ -188,6 +188,14 @@ unsigned int otSysGetThreadNetifIndex(void);
 const char *otSysGetInfraNetifName(void);
 
 /**
+ * Returns the infrastructure network interface index.
+ *
+ * @returns The infrastructure network interface index.
+ *
+ */
+uint32_t otSysGetInfraNetifIndex(void);
+
+/**
  * Returns the radio spinel metrics.
  *
  * @returns The radio spinel metrics.
@@ -237,6 +245,14 @@ void otSysCountInfraNetifAddresses(otSysInfraNetIfAddressCounters *aAddressCount
  *
  */
 void otSysSetInfraNetif(const char *aInfraNetifName, int aIcmp6Socket);
+
+/**
+ * Returns TRUE if the infrastructure interface is running.
+ *
+ * @returns TRUE if the infrastructure interface is running, FALSE if not.
+ *
+ */
+bool otSysInfraIfIsRunning(void);
 
 #ifdef __cplusplus
 } // end of extern "C"
