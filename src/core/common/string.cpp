@@ -160,6 +160,61 @@ bool StringMatch(const char *aFirstString, const char *aSecondString, StringMatc
     return Match(aFirstString, aSecondString, aMode) == kFullMatch;
 }
 
+Error StringCopy(char *aTargetBuffer, uint16_t aTargetSize, const char *aSource, StringEncodingCheck aEncodingCheck)
+{
+    Error    error = kErrorNone;
+    uint16_t length;
+
+    if (aSource == nullptr)
+    {
+        aTargetBuffer[0] = kNullChar;
+        ExitNow();
+    }
+
+    length = StringLength(aSource, aTargetSize);
+    VerifyOrExit(length < aTargetSize, error = kErrorInvalidArgs);
+
+    switch (aEncodingCheck)
+    {
+    case kStringNoEncodingCheck:
+        break;
+    case kStringCheckUtf8Encoding:
+        VerifyOrExit(IsValidUtf8String(aSource), error = kErrorParse);
+        break;
+    }
+
+    memcpy(aTargetBuffer, aSource, length + 1); // `+ 1` to also copy null char.
+
+exit:
+    return error;
+}
+
+Error StringParseUint8(const char *&aString, uint8_t &aUint8)
+{
+    return StringParseUint8(aString, aUint8, NumericLimits<uint8_t>::kMax);
+}
+
+Error StringParseUint8(const char *&aString, uint8_t &aUint8, uint8_t aMaxValue)
+{
+    Error       error = kErrorParse;
+    const char *cur   = aString;
+    uint16_t    value = 0;
+
+    for (; (*cur >= '0') && (*cur <= '9'); cur++)
+    {
+        value *= 10;
+        value += static_cast<uint8_t>(*cur - '0');
+        VerifyOrExit(value <= aMaxValue, error = kErrorParse);
+        error = kErrorNone;
+    }
+
+    aString = cur;
+    aUint8  = static_cast<uint8_t>(value);
+
+exit:
+    return error;
+}
+
 void StringConvertToLowercase(char *aString)
 {
     for (; *aString != kNullChar; aString++)
@@ -255,10 +310,17 @@ StringWriter &StringWriter::AppendHexBytes(const uint8_t *aBytes, uint16_t aLeng
     return *this;
 }
 
-bool IsValidUtf8String(const char *aString)
+StringWriter &StringWriter::AppendCharMultipleTimes(char aChar, uint16_t aCount)
 {
-    return IsValidUtf8String(aString, strlen(aString));
+    while (aCount--)
+    {
+        Append("%c", aChar);
+    }
+
+    return *this;
 }
+
+bool IsValidUtf8String(const char *aString) { return IsValidUtf8String(aString, strlen(aString)); }
 
 bool IsValidUtf8String(const char *aString, size_t aLength)
 {

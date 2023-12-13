@@ -40,9 +40,9 @@
 
 #include <openthread/commissioner.h>
 
-#include "coap/coap.hpp"
 #include "coap/coap_secure.hpp"
 #include "common/as_core_type.hpp"
+#include "common/callback.hpp"
 #include "common/clearable.hpp"
 #include "common/locator.hpp"
 #include "common/log.hpp"
@@ -57,6 +57,7 @@
 #include "net/udp6.hpp"
 #include "thread/key_manager.hpp"
 #include "thread/mle.hpp"
+#include "thread/tmf.hpp"
 
 namespace ot {
 
@@ -64,9 +65,12 @@ namespace MeshCoP {
 
 class Commissioner : public InstanceLocator, private NonCopyable
 {
+    friend class Tmf::Agent;
+    friend class Tmf::SecureAgent;
+
 public:
     /**
-     * This enumeration type represents the Commissioner State.
+     * Type represents the Commissioner State.
      *
      */
     enum State : uint8_t
@@ -77,7 +81,7 @@ public:
     };
 
     /**
-     * This enumeration type represents Joiner Event.
+     * Type represents Joiner Event.
      *
      */
     enum JoinerEvent : uint8_t
@@ -93,135 +97,7 @@ public:
     typedef otCommissionerJoinerCallback JoinerCallback; ///< Joiner state change callback function pointer type.
 
     /**
-     * This type represents a Commissioning Dataset.
-     *
-     */
-    class Dataset : public otCommissioningDataset, public Clearable<Dataset>
-    {
-    public:
-        /**
-         * This method indicates whether or not the Border Router RLOC16 Locator is set in the Dataset.
-         *
-         * @returns TRUE if Border Router RLOC16 Locator is set, FALSE otherwise.
-         *
-         */
-        bool IsLocatorSet(void) const { return mIsLocatorSet; }
-
-        /**
-         * This method gets the Border Router RLOC16 Locator in the Dataset.
-         *
-         * This method MUST be used when Locator is set in the Dataset, otherwise its behavior is undefined.
-         *
-         * @returns The Border Router RLOC16 Locator in the Dataset.
-         *
-         */
-        uint16_t GetLocator(void) const { return mLocator; }
-
-        /**
-         * This method sets the Border Router RLOCG16 Locator in the Dataset.
-         *
-         * @param[in] aLocator  A Locator.
-         *
-         */
-        void SetLocator(uint16_t aLocator)
-        {
-            mIsLocatorSet = true;
-            mLocator      = aLocator;
-        }
-
-        /**
-         * This method indicates whether or not the Session ID is set in the Dataset.
-         *
-         * @returns TRUE if Session ID is set, FALSE otherwise.
-         *
-         */
-        bool IsSessionIdSet(void) const { return mIsSessionIdSet; }
-
-        /**
-         * This method gets the Session ID in the Dataset.
-         *
-         * This method MUST be used when Session ID is set in the Dataset, otherwise its behavior is undefined.
-         *
-         * @returns The Session ID in the Dataset.
-         *
-         */
-        uint16_t GetSessionId(void) const { return mSessionId; }
-
-        /**
-         * This method sets the Session ID in the Dataset.
-         *
-         * @param[in] aSessionId  The Session ID.
-         *
-         */
-        void SetSessionId(uint16_t aSessionId)
-        {
-            mIsSessionIdSet = true;
-            mSessionId      = aSessionId;
-        }
-
-        /**
-         * This method indicates whether or not the Steering Data is set in the Dataset.
-         *
-         * @returns TRUE if Steering Data is set, FALSE otherwise.
-         *
-         */
-        bool IsSteeringDataSet(void) const { return mIsSteeringDataSet; }
-
-        /**
-         * This method gets the Steering Data in the Dataset.
-         *
-         * This method MUST be used when Steering Data is set in the Dataset, otherwise its behavior is undefined.
-         *
-         * @returns The Steering Data in the Dataset.
-         *
-         */
-        const SteeringData &GetSteeringData(void) const { return AsCoreType(&mSteeringData); }
-
-        /**
-         * This method returns a reference to the Steering Data in the Dataset to be updated by caller.
-         *
-         * @returns A reference to the Steering Data in the Dataset.
-         *
-         */
-        SteeringData &UpdateSteeringData(void)
-        {
-            mIsSteeringDataSet = true;
-            return AsCoreType(&mSteeringData);
-        }
-
-        /**
-         * This method indicates whether or not the Joiner UDP port is set in the Dataset.
-         *
-         * @returns TRUE if Joiner UDP port is set, FALSE otherwise.
-         *
-         */
-        bool IsJoinerUdpPortSet(void) const { return mIsJoinerUdpPortSet; }
-
-        /**
-         * This method gets the Joiner UDP port in the Dataset.
-         *
-         * This method MUST be used when Joiner UDP port is set in the Dataset, otherwise its behavior is undefined.
-         *
-         * @returns The Joiner UDP port in the Dataset.
-         *
-         */
-        uint16_t GetJoinerUdpPort(void) const { return mJoinerUdpPort; }
-
-        /**
-         * This method sets the Joiner UDP Port in the Dataset.
-         *
-         * @param[in] aJoinerUdpPort  The Joiner UDP Port.
-         *
-         */
-        void SetJoinerUdpPort(uint16_t aJoinerUdpPort)
-        {
-            mIsJoinerUdpPortSet = true;
-            mJoinerUdpPort      = aJoinerUdpPort;
-        }
-    };
-
-    /**
-     * This constructor initializes the Commissioner object.
+     * Initializes the Commissioner object.
      *
      * @param[in]  aInstance     A reference to the OpenThread instance.
      *
@@ -229,7 +105,7 @@ public:
     explicit Commissioner(Instance &aInstance);
 
     /**
-     * This method starts the Commissioner service.
+     * Starts the Commissioner service.
      *
      * @param[in]  aStateCallback    A pointer to a function that is called when the commissioner state changes.
      * @param[in]  aJoinerCallback   A pointer to a function that is called when a joiner event occurs.
@@ -243,7 +119,7 @@ public:
     Error Start(StateCallback aStateCallback, JoinerCallback aJoinerCallback, void *aCallbackContext);
 
     /**
-     * This method stops the Commissioner service.
+     * Stops the Commissioner service.
      *
      * @retval kErrorNone     Successfully stopped the Commissioner service.
      * @retval kErrorAlready  Commissioner is already stopped.
@@ -252,7 +128,7 @@ public:
     Error Stop(void) { return Stop(kSendKeepAliveToResign); }
 
     /**
-     * This method returns the Commissioner Id.
+     * Returns the Commissioner Id.
      *
      * @returns The Commissioner Id.
      *
@@ -260,7 +136,7 @@ public:
     const char *GetId(void) const { return mCommissionerId; }
 
     /**
-     * This method sets the Commissioner Id.
+     * Sets the Commissioner Id.
      *
      * @param[in]  aId   A pointer to a string character array. Must be null terminated.
      *
@@ -272,13 +148,13 @@ public:
     Error SetId(const char *aId);
 
     /**
-     * This method clears all Joiner entries.
+     * Clears all Joiner entries.
      *
      */
     void ClearJoiners(void);
 
     /**
-     * This method adds a Joiner entry accepting any Joiner.
+     * Adds a Joiner entry accepting any Joiner.
      *
      * @param[in]  aPskd         A pointer to the PSKd.
      * @param[in]  aTimeout      A time after which a Joiner is automatically removed, in seconds.
@@ -291,7 +167,7 @@ public:
     Error AddJoinerAny(const char *aPskd, uint32_t aTimeout) { return AddJoiner(nullptr, nullptr, aPskd, aTimeout); }
 
     /**
-     * This method adds a Joiner entry.
+     * Adds a Joiner entry.
      *
      * @param[in]  aEui64        The Joiner's IEEE EUI-64.
      * @param[in]  aPskd         A pointer to the PSKd.
@@ -308,7 +184,7 @@ public:
     }
 
     /**
-     * This method adds a Joiner entry with a Joiner Discerner.
+     * Adds a Joiner entry with a Joiner Discerner.
      *
      * @param[in]  aDiscerner  A Joiner Discerner.
      * @param[in]  aPskd       A pointer to the PSKd.
@@ -325,7 +201,7 @@ public:
     }
 
     /**
-     * This method get joiner info at aIterator position.
+     * Get joiner info at aIterator position.
      *
      * @param[in,out]   aIterator   A iterator to the index of the joiner.
      * @param[out]      aJoiner     A reference to Joiner info.
@@ -337,7 +213,7 @@ public:
     Error GetNextJoinerInfo(uint16_t &aIterator, otJoinerInfo &aJoiner) const;
 
     /**
-     * This method removes a Joiner entry accepting any Joiner.
+     * Removes a Joiner entry accepting any Joiner.
      *
      * @param[in]  aDelay         The delay to remove Joiner (in seconds).
      *
@@ -349,7 +225,7 @@ public:
     Error RemoveJoinerAny(uint32_t aDelay) { return RemoveJoiner(nullptr, nullptr, aDelay); }
 
     /**
-     * This method removes a Joiner entry.
+     * Removes a Joiner entry.
      *
      * @param[in]  aEui64         The Joiner's IEEE EUI-64.
      * @param[in]  aDelay         The delay to remove Joiner (in seconds).
@@ -365,7 +241,7 @@ public:
     }
 
     /**
-     * This method removes a Joiner entry.
+     * Removes a Joiner entry.
      *
      * @param[in]  aDiscerner     A Joiner Discerner.
      * @param[in]  aDelay         The delay to remove Joiner (in seconds).
@@ -381,7 +257,7 @@ public:
     }
 
     /**
-     * This method gets the Provisioning URL.
+     * Gets the Provisioning URL.
      *
      * @returns A pointer to char buffer containing the URL string.
      *
@@ -389,7 +265,7 @@ public:
     const char *GetProvisioningUrl(void) const { return mProvisioningUrl; }
 
     /**
-     * This method sets the Provisioning URL.
+     * Sets the Provisioning URL.
      *
      * @param[in]  aProvisioningUrl  A pointer to the Provisioning URL (may be `nullptr` to set URL to empty string).
      *
@@ -400,7 +276,7 @@ public:
     Error SetProvisioningUrl(const char *aProvisioningUrl);
 
     /**
-     * This method returns the Commissioner Session ID.
+     * Returns the Commissioner Session ID.
      *
      * @returns The Commissioner Session ID.
      *
@@ -408,7 +284,7 @@ public:
     uint16_t GetSessionId(void) const { return mSessionId; }
 
     /**
-     * This method indicates whether or not the Commissioner role is active.
+     * Indicates whether or not the Commissioner role is active.
      *
      * @returns TRUE if the Commissioner role is active, FALSE otherwise.
      *
@@ -416,7 +292,7 @@ public:
     bool IsActive(void) const { return mState == kStateActive; }
 
     /**
-     * This method indicates whether or not the Commissioner role is disabled.
+     * Indicates whether or not the Commissioner role is disabled.
      *
      * @returns TRUE if the Commissioner role is disabled, FALSE otherwise.
      *
@@ -424,7 +300,7 @@ public:
     bool IsDisabled(void) const { return mState == kStateDisabled; }
 
     /**
-     * This method gets the Commissioner State.
+     * Gets the Commissioner State.
      *
      * @returns The Commissioner State.
      *
@@ -432,7 +308,7 @@ public:
     State GetState(void) const { return mState; }
 
     /**
-     * This method sends MGMT_COMMISSIONER_GET.
+     * Sends MGMT_COMMISSIONER_GET.
      *
      * @param[in]  aTlvs        A pointer to Commissioning Data TLVs.
      * @param[in]  aLength      The length of requested TLVs in bytes.
@@ -445,7 +321,7 @@ public:
     Error SendMgmtCommissionerGetRequest(const uint8_t *aTlvs, uint8_t aLength);
 
     /**
-     * This method sends MGMT_COMMISSIONER_SET.
+     * Sends MGMT_COMMISSIONER_SET.
      *
      * @param[in]  aDataset     A reference to Commissioning Data.
      * @param[in]  aTlvs        A pointer to user specific Commissioning Data TLVs.
@@ -456,10 +332,10 @@ public:
      * @retval kErrorInvalidState  Commissioner service is not started.
      *
      */
-    Error SendMgmtCommissionerSetRequest(const Dataset &aDataset, const uint8_t *aTlvs, uint8_t aLength);
+    Error SendMgmtCommissionerSetRequest(const CommissioningDataset &aDataset, const uint8_t *aTlvs, uint8_t aLength);
 
     /**
-     * This method returns a reference to the AnnounceBeginClient instance.
+     * Returns a reference to the AnnounceBeginClient instance.
      *
      * @returns A reference to the AnnounceBeginClient instance.
      *
@@ -467,7 +343,7 @@ public:
     AnnounceBeginClient &GetAnnounceBeginClient(void) { return mAnnounceBegin; }
 
     /**
-     * This method returns a reference to the EnergyScanClient instance.
+     * Returns a reference to the EnergyScanClient instance.
      *
      * @returns A reference to the EnergyScanClient instance.
      *
@@ -475,18 +351,12 @@ public:
     EnergyScanClient &GetEnergyScanClient(void) { return mEnergyScan; }
 
     /**
-     * This method returns a reference to the PanIdQueryClient instance.
+     * Returns a reference to the PanIdQueryClient instance.
      *
      * @returns A reference to the PanIdQueryClient instance.
      *
      */
     PanIdQueryClient &GetPanIdQueryClient(void) { return mPanIdQuery; }
-
-    /**
-     * This method applies the Mesh Local Prefix.
-     *
-     */
-    void ApplyMeshLocalPrefix(void);
 
 private:
     static constexpr uint32_t kPetitionAttemptDelay = 5;  // COMM_PET_ATTEMPT_DELAY (seconds)
@@ -494,6 +364,9 @@ private:
     static constexpr uint32_t kPetitionRetryDelay   = 1;  // COMM_PET_RETRY_DELAY (seconds)
     static constexpr uint32_t kKeepAliveTimeout     = 50; // TIMEOUT_COMM_PET (seconds)
     static constexpr uint32_t kRemoveJoinerDelay    = 20; // Delay to remove successfully joined joiner
+
+    static constexpr uint32_t kJoinerSessionTimeoutMillis =
+        1000 * OPENTHREAD_CONFIG_COMMISSIONER_JOINER_SESSION_TIMEOUT; // Expiration time for active Joiner session
 
     enum ResignMode : uint8_t
     {
@@ -534,58 +407,47 @@ private:
 
     Error AddJoiner(const Mac::ExtAddress *aEui64,
                     const JoinerDiscerner *aDiscerner,
-                    const char *           aPskd,
+                    const char            *aPskd,
                     uint32_t               aTimeout);
     Error RemoveJoiner(const Mac::ExtAddress *aEui64, const JoinerDiscerner *aDiscerner, uint32_t aDelay);
     void  RemoveJoiner(Joiner &aJoiner, uint32_t aDelay);
 
-    void AddCoapResources(void);
-    void RemoveCoapResources(void);
+    void HandleTimer(void);
+    void HandleJoinerExpirationTimer(void);
 
-    static void HandleTimer(Timer &aTimer);
-    void        HandleTimer(void);
-
-    static void HandleJoinerExpirationTimer(Timer &aTimer);
-    void        HandleJoinerExpirationTimer(void);
-
-    void UpdateJoinerExpirationTimer(void);
-
-    static void HandleMgmtCommissionerSetResponse(void *               aContext,
-                                                  otMessage *          aMessage,
+    static void HandleMgmtCommissionerSetResponse(void                *aContext,
+                                                  otMessage           *aMessage,
                                                   const otMessageInfo *aMessageInfo,
                                                   Error                aResult);
-    void        HandleMgmtCommissionerSetResponse(Coap::Message *         aMessage,
+    void        HandleMgmtCommissionerSetResponse(Coap::Message          *aMessage,
                                                   const Ip6::MessageInfo *aMessageInfo,
                                                   Error                   aResult);
-    static void HandleMgmtCommissionerGetResponse(void *               aContext,
-                                                  otMessage *          aMessage,
+    static void HandleMgmtCommissionerGetResponse(void                *aContext,
+                                                  otMessage           *aMessage,
                                                   const otMessageInfo *aMessageInfo,
                                                   Error                aResult);
-    void        HandleMgmtCommissionerGetResponse(Coap::Message *         aMessage,
+    void        HandleMgmtCommissionerGetResponse(Coap::Message          *aMessage,
                                                   const Ip6::MessageInfo *aMessageInfo,
                                                   Error                   aResult);
-    static void HandleLeaderPetitionResponse(void *               aContext,
-                                             otMessage *          aMessage,
+    static void HandleLeaderPetitionResponse(void                *aContext,
+                                             otMessage           *aMessage,
                                              const otMessageInfo *aMessageInfo,
                                              Error                aResult);
     void HandleLeaderPetitionResponse(Coap::Message *aMessage, const Ip6::MessageInfo *aMessageInfo, Error aResult);
-    static void HandleLeaderKeepAliveResponse(void *               aContext,
-                                              otMessage *          aMessage,
+    static void HandleLeaderKeepAliveResponse(void                *aContext,
+                                              otMessage           *aMessage,
                                               const otMessageInfo *aMessageInfo,
                                               Error                aResult);
     void HandleLeaderKeepAliveResponse(Coap::Message *aMessage, const Ip6::MessageInfo *aMessageInfo, Error aResult);
 
-    static void HandleCoapsConnected(bool aConnected, void *aContext);
-    void        HandleCoapsConnected(bool aConnected);
+    static void HandleSecureAgentConnected(bool aConnected, void *aContext);
+    void        HandleSecureAgentConnected(bool aConnected);
 
-    static void HandleRelayReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
-    void        HandleRelayReceive(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+    template <Uri kUri> void HandleTmf(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
-    static void HandleDatasetChanged(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
-    void        HandleDatasetChanged(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+    void HandleRelayReceive(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
-    static void HandleJoinerFinalize(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
-    void        HandleJoinerFinalize(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
+    void HandleJoinerSessionTimer(void);
 
     void SendJoinFinalizeResponse(const Coap::Message &aRequest, StateTlv::State aState);
 
@@ -604,20 +466,21 @@ private:
 
     static const char *StateToString(State aState);
 
+    using JoinerExpirationTimer = TimerMilliIn<Commissioner, &Commissioner::HandleJoinerExpirationTimer>;
+    using CommissionerTimer     = TimerMilliIn<Commissioner, &Commissioner::HandleTimer>;
+    using JoinerSessionTimer    = TimerMilliIn<Commissioner, &Commissioner::HandleJoinerSessionTimer>;
+
     Joiner mJoiners[OPENTHREAD_CONFIG_COMMISSIONER_MAX_JOINER_ENTRIES];
 
-    Joiner *                 mActiveJoiner;
+    Joiner                  *mActiveJoiner;
     Ip6::InterfaceIdentifier mJoinerIid;
     uint16_t                 mJoinerPort;
     uint16_t                 mJoinerRloc;
     uint16_t                 mSessionId;
     uint8_t                  mTransmitAttempts;
-    TimerMilli               mJoinerExpirationTimer;
-    TimerMilli               mTimer;
-
-    Coap::Resource mRelayReceive;
-    Coap::Resource mDatasetChanged;
-    Coap::Resource mJoinerFinalize;
+    JoinerExpirationTimer    mJoinerExpirationTimer;
+    CommissionerTimer        mTimer;
+    JoinerSessionTimer       mJoinerSessionTimer;
 
     AnnounceBeginClient mAnnounceBegin;
     EnergyScanClient    mEnergyScan;
@@ -625,21 +488,23 @@ private:
 
     Ip6::Netif::UnicastAddress mCommissionerAloc;
 
-    char mProvisioningUrl[OT_PROVISIONING_URL_MAX_SIZE + 1]; // + 1 is for null char at end of string.
-    char mCommissionerId[CommissionerIdTlv::kMaxLength + 1];
+    ProvisioningUrlTlv::StringType mProvisioningUrl;
+    CommissionerIdTlv::StringType  mCommissionerId;
 
     State mState;
 
-    StateCallback  mStateCallback;
-    JoinerCallback mJoinerCallback;
-    void *         mCallbackContext;
+    Callback<StateCallback>  mStateCallback;
+    Callback<JoinerCallback> mJoinerCallback;
 };
+
+DeclareTmfHandler(Commissioner, kUriDatasetChanged);
+DeclareTmfHandler(Commissioner, kUriRelayRx);
+DeclareTmfHandler(Commissioner, kUriJoinerFinalize);
 
 } // namespace MeshCoP
 
 DefineMapEnum(otCommissionerState, MeshCoP::Commissioner::State);
 DefineMapEnum(otCommissionerJoinerEvent, MeshCoP::Commissioner::JoinerEvent);
-DefineCoreType(otCommissioningDataset, MeshCoP::Commissioner::Dataset);
 
 } // namespace ot
 

@@ -34,7 +34,7 @@
 
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
-#include "common/instance.hpp"
+#include "instance/instance.hpp"
 #include "net/netif.hpp"
 
 #include "test_util.h"
@@ -89,7 +89,7 @@ void TestNetifMulticastAddresses(void)
 {
     const uint8_t kMaxAddresses = 8;
 
-    Instance *   instance = testInitInstance();
+    Instance    *instance = testInitInstance();
     TestNetif    netif(*instance);
     Ip6::Address addresses[kMaxAddresses];
 

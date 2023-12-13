@@ -34,6 +34,8 @@
 #ifndef OPENTHREAD_SPINEL_CONFIG_H_
 #define OPENTHREAD_SPINEL_CONFIG_H_
 
+#include "openthread-core-config.h"
+
 /**
  * @def OPENTHREAD_SPINEL_CONFIG_OPENTHREAD_MESSAGE_ENABLE
  *
@@ -53,6 +55,38 @@
  */
 #ifndef OPENTHREAD_SPINEL_CONFIG_RCP_RESTORATION_MAX_COUNT
 #define OPENTHREAD_SPINEL_CONFIG_RCP_RESTORATION_MAX_COUNT 0
+#endif
+
+/**
+ * @def OPENTHREAD_SPINEL_CONFIG_ABORT_ON_UNEXPECTED_RCP_RESET_ENABLE
+ *
+ * Define 1 to abort the host when receiving unexpected reset from RCP.
+ *
+ */
+#ifndef OPENTHREAD_SPINEL_CONFIG_ABORT_ON_UNEXPECTED_RCP_RESET_ENABLE
+#define OPENTHREAD_SPINEL_CONFIG_ABORT_ON_UNEXPECTED_RCP_RESET_ENABLE 0
+#endif
+
+/**
+ * @def OPENTHREAD_SPINEL_CONFIG_RCP_TIME_SYNC_INTERVAL
+ *
+ * This setting configures the interval (in units of microseconds) for host-rcp
+ * time sync. The host will recalculate the time offset between host and RCP
+ * every interval.
+ *
+ */
+#ifndef OPENTHREAD_SPINEL_CONFIG_RCP_TIME_SYNC_INTERVAL
+#define OPENTHREAD_SPINEL_CONFIG_RCP_TIME_SYNC_INTERVAL (60 * 1000 * 1000)
+#endif
+
+/**
+ * @def OPENTHREAD_SPINEL_CONFIG_BROADCAST_IID
+ *
+ * Define broadcast IID for spinel frames dedicated to all hosts in multipan configuration.
+ *
+ */
+#ifndef OPENTHREAD_SPINEL_CONFIG_BROADCAST_IID
+#define OPENTHREAD_SPINEL_CONFIG_BROADCAST_IID SPINEL_HEADER_IID_3
 #endif
 
 #endif // OPENTHREAD_SPINEL_CONFIG_H_

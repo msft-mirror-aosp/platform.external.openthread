@@ -30,7 +30,7 @@
 
 #include "common/array.hpp"
 #include "common/code_utils.hpp"
-#include "common/instance.hpp"
+#include "instance/instance.hpp"
 #include "thread/network_data_leader.hpp"
 #include "thread/network_data_local.hpp"
 #include "thread/network_data_service.hpp"
@@ -93,7 +93,7 @@ void VerifyRlocsArray(const uint16_t *aRlocs, uint16_t aRlocsLength, const uint1
 
     printf("\nRLOCs: { ");
 
-    for (uint8_t index = 0; index < aRlocsLength; index++)
+    for (uint16_t index = 0; index < aRlocsLength; index++)
     {
         VerifyOrQuit(aRlocs[index] == aExpectedRlocs[index]);
         printf("0x%04x ", aRlocs[index]);
@@ -106,7 +106,7 @@ void TestNetworkDataIterator(void)
 {
     static constexpr uint8_t kMaxRlocsArray = 10;
 
-    ot::Instance *      instance;
+    Instance           *instance;
     Iterator            iter = kIteratorInit;
     ExternalRouteConfig rconfig;
     OnMeshPrefixConfig  pconfig;
@@ -134,6 +134,7 @@ void TestNetworkDataIterator(void)
                 false,  // mNat64
                 false,  // mStable
                 false,  // mNextHopIsThisDevice
+                false,  // mAdvPio
             },
             {
                 {
@@ -146,6 +147,7 @@ void TestNetworkDataIterator(void)
                 false,  // mNat64
                 true,   // mStable
                 false,  // mNextHopIsThisDevice
+                false,  // mAdvPio
             },
         };
 
@@ -494,7 +496,7 @@ void TestNetworkDataIterator(void)
 class TestNetworkData : public Local
 {
 public:
-    explicit TestNetworkData(ot::Instance &aInstance)
+    explicit TestNetworkData(Instance &aInstance)
         : Local(aInstance)
     {
     }
@@ -581,7 +583,7 @@ public:
 
 void TestNetworkDataFindNextService(void)
 {
-    ot::Instance *instance;
+    Instance *instance;
 
     printf("\n\n-------------------------------------------------");
     printf("\nTestNetworkDataFindNextService()\n");
@@ -614,7 +616,7 @@ void TestNetworkDataDsnSrpServices(void)
         }
     };
 
-    ot::Instance *instance;
+    Instance *instance;
 
     printf("\n\n-------------------------------------------------");
     printf("\nTestNetworkDataDsnSrpServices()\n");
@@ -639,9 +641,10 @@ void TestNetworkDataDsnSrpServices(void)
 
         struct UnicastEntry
         {
-            const char *                   mAddress;
+            const char                    *mAddress;
             uint16_t                       mPort;
             Service::DnsSrpUnicast::Origin mOrigin;
+            uint16_t                       mRloc16;
 
             bool Matches(Service::DnsSrpUnicast::Info aInfo) const
             {
@@ -650,7 +653,7 @@ void TestNetworkDataDsnSrpServices(void)
                 SuccessOrQuit(sockAddr.GetAddress().FromString(mAddress));
                 sockAddr.SetPort(mPort);
 
-                return (aInfo.mSockAddr == sockAddr) && (aInfo.mOrigin == mOrigin);
+                return (aInfo.mSockAddr == sockAddr) && (aInfo.mOrigin == mOrigin) && (aInfo.mRloc16 == mRloc16);
             }
         };
 
@@ -671,16 +674,16 @@ void TestNetworkDataDsnSrpServices(void)
         };
 
         const UnicastEntry kUnicastEntries[] = {
-            {"fdde:ad00:beef:0:2d0e:c627:5556:18d9", 0x1234, Service::DnsSrpUnicast::kFromServiceData},
-            {"fd00:aabb:ccdd:eeff:11:2233:4455:6677", 0xabcd, Service::DnsSrpUnicast::kFromServerData},
-            {"fdde:ad00:beef:0:0:ff:fe00:2800", 0x5678, Service::DnsSrpUnicast::kFromServerData},
-            {"fd00:1234:5678:9abc:def0:123:4567:89ab", 0x0e, Service::DnsSrpUnicast::kFromServerData},
-            {"fdde:ad00:beef:0:0:ff:fe00:6c00", 0xcd12, Service::DnsSrpUnicast::kFromServerData},
+            {"fdde:ad00:beef:0:2d0e:c627:5556:18d9", 0x1234, Service::DnsSrpUnicast::kFromServiceData, 0xfffe},
+            {"fd00:aabb:ccdd:eeff:11:2233:4455:6677", 0xabcd, Service::DnsSrpUnicast::kFromServerData, 0x6c00},
+            {"fdde:ad00:beef:0:0:ff:fe00:2800", 0x5678, Service::DnsSrpUnicast::kFromServerData, 0x2800},
+            {"fd00:1234:5678:9abc:def0:123:4567:89ab", 0x0e, Service::DnsSrpUnicast::kFromServerData, 0x4c00},
+            {"fdde:ad00:beef:0:0:ff:fe00:6c00", 0xcd12, Service::DnsSrpUnicast::kFromServerData, 0x6c00},
         };
 
         const uint8_t kPreferredAnycastEntryIndex = 2;
 
-        Service::Manager &           manager = instance->Get<Service::Manager>();
+        Service::Manager            &manager = instance->Get<Service::Manager>();
         Service::Manager::Iterator   iterator;
         Service::DnsSrpAnycast::Info anycastInfo;
         Service::DnsSrpUnicast::Info unicastInfo;
@@ -725,8 +728,8 @@ void TestNetworkDataDsnSrpServices(void)
         for (const UnicastEntry &entry : kUnicastEntries)
         {
             SuccessOrQuit(manager.GetNextDnsSrpUnicastInfo(iterator, unicastInfo));
-            printf("\nunicastInfo { %s, origin:%s }", unicastInfo.mSockAddr.ToString().AsCString(),
-                   kOriginStrings[unicastInfo.mOrigin]);
+            printf("\nunicastInfo { %s, origin:%s, rloc16:%04x }", unicastInfo.mSockAddr.ToString().AsCString(),
+                   kOriginStrings[unicastInfo.mOrigin], unicastInfo.mRloc16);
 
             VerifyOrQuit(entry.Matches(unicastInfo), "GetNextDnsSrpUnicastInfo() returned incorrect info");
         }
@@ -761,7 +764,7 @@ void TestNetworkDataDsnSrpAnycastSeqNumSelection(void)
         uint8_t        mPreferredSeqNum;
     };
 
-    ot::Instance *instance;
+    Instance *instance;
 
     printf("\n\n-------------------------------------------------");
     printf("\nTestNetworkDataDsnSrpAnycastSeqNumSelection()\n");
