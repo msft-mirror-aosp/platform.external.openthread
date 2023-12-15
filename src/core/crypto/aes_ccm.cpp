@@ -33,8 +33,6 @@
 
 #include "aes_ccm.hpp"
 
-#include <limits.h>
-
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
 #include "common/encoding.hpp"
@@ -280,12 +278,12 @@ void AesCcm::Finalize(void *aTag)
 void AesCcm::GenerateNonce(const Mac::ExtAddress &aAddress,
                            uint32_t               aFrameCounter,
                            uint8_t                aSecurityLevel,
-                           uint8_t *              aNonce)
+                           uint8_t               *aNonce)
 {
     memcpy(aNonce, aAddress.m8, sizeof(Mac::ExtAddress));
     aNonce += sizeof(Mac::ExtAddress);
 
-    Encoding::BigEndian::WriteUint32(aFrameCounter, aNonce);
+    BigEndian::WriteUint32(aFrameCounter, aNonce);
     aNonce += sizeof(uint32_t);
 
     aNonce[0] = aSecurityLevel;

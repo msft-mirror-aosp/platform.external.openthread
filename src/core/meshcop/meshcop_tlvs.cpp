@@ -35,6 +35,8 @@
 
 #include "common/const_cast.hpp"
 #include "common/debug.hpp"
+#include "common/num_utils.hpp"
+#include "common/numeric_limits.hpp"
 #include "common/string.hpp"
 #include "meshcop/meshcop.hpp"
 
@@ -43,76 +45,52 @@ namespace MeshCoP {
 
 bool Tlv::IsValid(const Tlv &aTlv)
 {
-    bool rval = true;
+    bool    isValid   = true;
+    uint8_t minLength = 0;
 
     switch (aTlv.GetType())
     {
-    case Tlv::kChannel:
-        rval = As<ChannelTlv>(aTlv).IsValid();
-        break;
-
     case Tlv::kPanId:
-        rval = As<PanIdTlv>(aTlv).IsValid();
+        minLength = sizeof(PanIdTlv::UintValueType);
         break;
-
     case Tlv::kExtendedPanId:
-        rval = As<ExtendedPanIdTlv>(aTlv).IsValid();
+        minLength = sizeof(ExtendedPanIdTlv::ValueType);
         break;
-
-    case Tlv::kNetworkName:
-        rval = As<NetworkNameTlv>(aTlv).IsValid();
-        break;
-
-    case Tlv::kNetworkKey:
-        rval = As<NetworkKeyTlv>(aTlv).IsValid();
-        break;
-
     case Tlv::kPskc:
-        rval = As<PskcTlv>(aTlv).IsValid();
+        minLength = sizeof(PskcTlv::ValueType);
+        break;
+    case Tlv::kNetworkKey:
+        minLength = sizeof(NetworkKeyTlv::ValueType);
+        break;
+    case Tlv::kMeshLocalPrefix:
+        minLength = sizeof(MeshLocalPrefixTlv::ValueType);
         break;
 
-    case Tlv::kMeshLocalPrefix:
-        rval = As<MeshLocalPrefixTlv>(aTlv).IsValid();
+    case Tlv::kChannel:
+        isValid = As<ChannelTlv>(aTlv).IsValid();
+        break;
+    case Tlv::kNetworkName:
+        isValid = As<NetworkNameTlv>(aTlv).IsValid();
         break;
 
     case Tlv::kSecurityPolicy:
-        rval = As<SecurityPolicyTlv>(aTlv).IsValid();
+        isValid = As<SecurityPolicyTlv>(aTlv).IsValid();
         break;
 
     case Tlv::kChannelMask:
-        rval = As<ChannelMaskTlv>(aTlv).IsValid();
+        isValid = As<ChannelMaskTlv>(aTlv).IsValid();
         break;
 
     default:
         break;
     }
 
-    return rval;
-}
-
-const Tlv *Tlv::FindTlv(const uint8_t *aTlvsStart, uint16_t aTlvsLength, Type aType)
-{
-    const Tlv *tlv;
-    const Tlv *end = reinterpret_cast<const Tlv *>(aTlvsStart + aTlvsLength);
-
-    for (tlv = reinterpret_cast<const Tlv *>(aTlvsStart); tlv < end; tlv = tlv->GetNext())
+    if (minLength > 0)
     {
-        VerifyOrExit((tlv + 1) <= end, tlv = nullptr);
-        VerifyOrExit(!tlv->IsExtended() ||
-                         (reinterpret_cast<const ExtendedTlv *>(tlv) + 1 <= reinterpret_cast<const ExtendedTlv *>(end)),
-                     tlv = nullptr);
-        VerifyOrExit(tlv->GetNext() <= end, tlv = nullptr);
-
-        if (tlv->GetType() == aType)
-        {
-            ExitNow();
-        }
+        isValid = (aTlv.GetLength() >= minLength);
     }
 
-    tlv = nullptr;
-
-exit:
-    return tlv;
+    return isValid;
 }
 
 NameData NetworkNameTlv::GetNetworkName(void) const
@@ -135,10 +113,7 @@ void NetworkNameTlv::SetNetworkName(const NameData &aNameData)
     SetLength(len);
 }
 
-bool NetworkNameTlv::IsValid(void) const
-{
-    return GetLength() >= 1 && IsValidUtf8String(mNetworkName, GetLength());
-}
+bool NetworkNameTlv::IsValid(void) const { return IsValidUtf8String(mNetworkName, GetLength()); }
 
 void SteeringDataTlv::CopyTo(SteeringData &aSteeringData) const
 {
@@ -154,7 +129,7 @@ bool SecurityPolicyTlv::IsValid(void) const
 SecurityPolicy SecurityPolicyTlv::GetSecurityPolicy(void) const
 {
     SecurityPolicy securityPolicy;
-    uint8_t        length = OT_MIN(static_cast<uint8_t>(sizeof(mFlags)), GetFlagsLength());
+    uint8_t        length = Min(static_cast<uint8_t>(sizeof(mFlags)), GetFlagsLength());
 
     securityPolicy.mRotationTime = GetRotationTime();
     securityPolicy.SetFlags(mFlags, length);
@@ -173,7 +148,7 @@ bool ChannelTlv::IsValid(void) const
     bool ret = false;
 
     VerifyOrExit(GetLength() == sizeof(*this) - sizeof(Tlv));
-    VerifyOrExit(mChannelPage < sizeof(uint32_t) * CHAR_BIT);
+    VerifyOrExit(mChannelPage < BitSizeOf(uint32_t));
     VerifyOrExit((1U << mChannelPage) & Radio::kSupportedChannelPages);
     VerifyOrExit(Radio::kChannelMin <= GetChannel() && GetChannel() <= Radio::kChannelMax);
     ret = true;
@@ -210,7 +185,21 @@ void ChannelTlv::SetChannel(uint16_t aChannel)
 #endif
 
     SetChannelPage(channelPage);
-    mChannel = HostSwap16(aChannel);
+    mChannel = BigEndian::HostSwap16(aChannel);
+}
+
+const char *StateTlv::StateToString(State aState)
+{
+    static const char *const kStateStrings[] = {
+        "Pending", // (0) kPending,
+        "Accept",  // (1) kAccept
+        "Reject",  // (2) kReject,
+    };
+
+    static_assert(0 == kPending, "kPending value is incorrect");
+    static_assert(1 == kAccept, "kAccept value is incorrect");
+
+    return aState == kReject ? kStateStrings[2] : kStateStrings[aState];
 }
 
 bool ChannelMaskBaseTlv::IsValid(void) const
@@ -260,10 +249,7 @@ exit:
     return entry;
 }
 
-ChannelMaskEntryBase *ChannelMaskBaseTlv::GetFirstEntry(void)
-{
-    return AsNonConst(AsConst(this)->GetFirstEntry());
-}
+ChannelMaskEntryBase *ChannelMaskBaseTlv::GetFirstEntry(void) { return AsNonConst(AsConst(this)->GetFirstEntry()); }
 
 void ChannelMaskTlv::SetChannelMask(uint32_t aChannelMask)
 {
@@ -364,8 +350,7 @@ uint32_t ChannelMaskTlv::GetChannelMask(const Message &aMessage)
     uint16_t offset;
     uint16_t end;
 
-    SuccessOrExit(FindTlvValueOffset(aMessage, kChannelMask, offset, end));
-    end += offset;
+    SuccessOrExit(FindTlvValueStartEndOffsets(aMessage, kChannelMask, offset, end));
 
     while (offset + sizeof(ChannelMaskEntryBase) <= end)
     {
