@@ -45,6 +45,13 @@ if(OT_DAEMON)
     set(OT_PLATFORM_DEFINES ${OT_PLATFORM_DEFINES} PARENT_SCOPE)
 endif()
 
+if(OT_MULTIPAN_RCP)
+    target_compile_definitions(ot-posix-config
+        INTERFACE "OPENTHREAD_CONFIG_MULTIPAN_RCP_ENABLE=1"
+    )
+endif()
+
+
 option(OT_POSIX_INSTALL_EXTERNAL_ROUTES "Install External Routes as IPv6 routes" ON)
 if(OT_POSIX_INSTALL_EXTERNAL_ROUTES)
     target_compile_definitions(ot-posix-config
@@ -77,10 +84,24 @@ if (OT_POSIX_SECURE_SETTINGS)
     )
 endif()
 
-set(OT_POSIX_CONFIG_RCP_BUS "" CACHE STRING "RCP bus type")
-if(OT_POSIX_CONFIG_RCP_BUS)
+option(OT_POSIX_RCP_HDLC_BUS "enable RCP HDLC bus" OFF)
+if(OT_POSIX_RCP_HDLC_BUS)
     target_compile_definitions(ot-posix-config
-        INTERFACE "OPENTHREAD_POSIX_CONFIG_RCP_BUS=OT_POSIX_RCP_BUS_${OT_POSIX_CONFIG_RCP_BUS}"
+        INTERFACE "OPENTHREAD_POSIX_CONFIG_SPINEL_HDLC_INTERFACE_ENABLE=1"
+    )
+endif()
+
+option(OT_POSIX_RCP_SPI_BUS "enable RCP SPI bus" OFF)
+if(OT_POSIX_RCP_SPI_BUS)
+    target_compile_definitions(ot-posix-config
+        INTERFACE "OPENTHREAD_POSIX_CONFIG_SPINEL_SPI_INTERFACE_ENABLE=1"
+    )
+endif()
+
+option(OT_POSIX_RCP_VENDOR_BUS "enable RCP vendor bus" OFF)
+if(OT_POSIX_RCP_VENDOR_BUS)
+    target_compile_definitions(ot-posix-config
+        INTERFACE "OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_ENABLE=1"
     )
 endif()
 
@@ -103,7 +124,6 @@ endif()
 
 add_library(openthread-posix
     alarm.cpp
-    backbone.cpp
     backtrace.cpp
     configuration.cpp
     config_file.cpp
@@ -140,6 +160,7 @@ target_link_libraries(openthread-posix
         openthread-cli-ftd
         openthread-ftd
         openthread-hdlc
+        openthread-radio-spinel
         openthread-spinel-rcp
         openthread-url
         ot-config-ftd

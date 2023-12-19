@@ -86,22 +86,6 @@ typedef struct otPlatformConfig
 } otPlatformConfig;
 
 /**
- * Represents RCP interface metrics.
- *
- */
-typedef struct otRcpInterfaceMetrics
-{
-    uint8_t  mRcpInterfaceType;             ///< The RCP interface type.
-    uint64_t mTransferredFrameCount;        ///< The number of transferred frames.
-    uint64_t mTransferredValidFrameCount;   ///< The number of transferred valid frames.
-    uint64_t mTransferredGarbageFrameCount; ///< The number of transferred garbage frames.
-    uint64_t mRxFrameCount;                 ///< The number of received frames.
-    uint64_t mRxFrameByteCount;             ///< The number of received bytes.
-    uint64_t mTxFrameCount;                 ///< The number of transmitted frames.
-    uint64_t mTxFrameByteCount;             ///< The number of transmitted bytes.
-} otRcpInterfaceMetrics;
-
-/**
  * Performs all platform-specific initialization of OpenThread's drivers and initializes the OpenThread
  * instance.
  *
@@ -204,6 +188,14 @@ unsigned int otSysGetThreadNetifIndex(void);
 const char *otSysGetInfraNetifName(void);
 
 /**
+ * Returns the infrastructure network interface index.
+ *
+ * @returns The infrastructure network interface index.
+ *
+ */
+uint32_t otSysGetInfraNetifIndex(void);
+
+/**
  * Returns the radio spinel metrics.
  *
  * @returns The radio spinel metrics.
@@ -241,6 +233,26 @@ typedef struct otSysInfraNetIfAddressCounters
  *
  */
 void otSysCountInfraNetifAddresses(otSysInfraNetIfAddressCounters *aAddressCounters);
+
+/**
+ * Sets the infrastructure network interface and the ICMPv6 socket.
+ *
+ * This function specifies the network interface name and the ICMPv6 socket on that interface. After calling this
+ * function, the caller can call otBorderRoutingInit() to let Border Routing work on that interface.
+ *
+ * @param[in] aInfraNetifName  The name of the infrastructure network interface.
+ * @param[in] aIcmp6Socket     A SOCK_RAW socket running on the infrastructure network interface.
+ *
+ */
+void otSysSetInfraNetif(const char *aInfraNetifName, int aIcmp6Socket);
+
+/**
+ * Returns TRUE if the infrastructure interface is running.
+ *
+ * @returns TRUE if the infrastructure interface is running, FALSE if not.
+ *
+ */
+bool otSysInfraIfIsRunning(void);
 
 #ifdef __cplusplus
 } // end of extern "C"
