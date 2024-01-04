@@ -37,11 +37,11 @@
 #if OPENTHREAD_CONFIG_CHANNEL_MANAGER_ENABLE && OPENTHREAD_FTD
 
 #include "common/code_utils.hpp"
-#include "common/instance.hpp"
 #include "common/locator_getters.hpp"
 #include "common/log.hpp"
 #include "common/random.hpp"
 #include "common/string.hpp"
+#include "instance/instance.hpp"
 #include "meshcop/dataset_updater.hpp"
 #include "radio/radio.hpp"
 
@@ -57,7 +57,7 @@ ChannelManager::ChannelManager(Instance &aInstance)
     , mDelay(kMinimumDelay)
     , mChannel(0)
     , mState(kStateIdle)
-    , mTimer(aInstance, ChannelManager::HandleTimer)
+    , mTimer(aInstance)
     , mAutoSelectInterval(kDefaultAutoSelectInterval)
     , mAutoSelectEnabled(false)
     , mCcaFailureRateThreshold(kCcaFailureRateThreshold)
@@ -154,11 +154,6 @@ void ChannelManager::HandleDatasetUpdateDone(Error aError)
     StartAutoSelectTimer();
 }
 
-void ChannelManager::HandleTimer(Timer &aTimer)
-{
-    aTimer.Get<ChannelManager>().HandleTimer();
-}
-
 void ChannelManager::HandleTimer(void)
 {
     switch (mState)
@@ -191,8 +186,8 @@ Error ChannelManager::FindBetterChannel(uint8_t &aNewChannel, uint16_t &aOccupan
 
     if (Get<ChannelMonitor>().GetSampleCount() <= kMinChannelMonitorSampleCount)
     {
-        LogInfo("Too few samples (%d <= %d) to select channel", Get<ChannelMonitor>().GetSampleCount(),
-                kMinChannelMonitorSampleCount);
+        LogInfo("Too few samples (%lu <= %lu) to select channel", ToUlong(Get<ChannelMonitor>().GetSampleCount()),
+                ToUlong(kMinChannelMonitorSampleCount));
         ExitNow(error = kErrorInvalidState);
     }
 

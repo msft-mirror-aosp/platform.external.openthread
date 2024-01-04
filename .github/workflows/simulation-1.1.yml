@@ -28,43 +28,22 @@
 
 name: Simulation 1.1
 
-on: [push, pull_request]
+on:
+  push:
+    branches-ignore:
+      - 'dependabot/**'
+  pull_request:
+    branches:
+      - 'main'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.repository == 'openthread/openthread' && github.run_id) || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-
-  cancel-previous-runs:
-    runs-on: ubuntu-20.04
-    steps:
-    - uses: rokroskar/workflow-run-cleanup-action@master
-      env:
-        GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-      if: "github.ref != 'refs/heads/main'"
-
-  distcheck:
-    runs-on: ubuntu-20.04
-    env:
-      CC: clang
-      CXX: clang++
-      REFERENCE_DEVICE: 1
-      THREAD_VERSION: 1.1
-      VIRTUAL_TIME: 1
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        submodules: true
-    - name: Bootstrap
-      run: |
-        sudo rm /etc/apt/sources.list.d/* && sudo apt-get update
-        sudo apt-get --no-install-recommends install -y llvm-runtime python3-setuptools python3-wheel
-        python3 -m pip install -r tests/scripts/thread-cert/requirements.txt
-    - name: Run
-      run: |
-        export ASAN_SYMBOLIZER_PATH=`which llvm-symbolizer`
-        export ASAN_OPTIONS=symbolize=1
-        export DISTCHECK_CONFIGURE_FLAGS= CPPFLAGS=-DOPENTHREAD_SIMULATION_VIRTUAL_TIME=1
-        export DISTCHECK_BUILD=1
-        ./bootstrap
-        VERBOSE=1 make -f examples/Makefile-simulation distcheck
 
   packet-verification:
     runs-on: ubuntu-20.04
@@ -75,7 +54,12 @@ jobs:
       VIRTUAL_TIME: 1
       MULTIPLY: 3
     steps:
-    - uses: actions/checkout@v2
+    - name: Harden Runner
+      uses: step-security/harden-runner@eb238b55efaa70779f274895e782ed17c84f2895 # v2.6.1
+      with:
+        egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       with:
         submodules: true
     - name: Bootstrap
@@ -92,7 +76,7 @@ jobs:
     - name: Run
       run: |
         ./script/test cert_suite ./tests/scripts/thread-cert/Cert_*.py ./tests/scripts/thread-cert/test_*.py
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       if: ${{ failure() }}
       with:
         name: packet-verification-pcaps
@@ -102,7 +86,7 @@ jobs:
     - name: Generate Coverage
       run: |
         ./script/test generate_coverage gcc
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       with:
         name: cov-packet-verification
         path: tmp/coverage.info
@@ -118,30 +102,34 @@ jobs:
       THREAD_VERSION: 1.1
       VIRTUAL_TIME: 1
     steps:
-    - uses: actions/checkout@v2
+    - name: Harden Runner
+      uses: step-security/harden-runner@eb238b55efaa70779f274895e782ed17c84f2895 # v2.6.1
+      with:
+        egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       with:
         submodules: true
     - name: Bootstrap
       run: |
         sudo rm /etc/apt/sources.list.d/* && sudo apt-get update
-        sudo apt-get --no-install-recommends install -y g++-multilib python3-setuptools python3-wheel lcov
+        sudo apt-get --no-install-recommends install -y lcov ninja-build g++-multilib python3-setuptools python3-wheel
         python3 -m pip install -r tests/scripts/thread-cert/requirements.txt
     - name: Build
       run: |
-        ./bootstrap
-        make -f examples/Makefile-simulation
+        ./script/test build
     - name: Run
       run: |
-        VERBOSE=1 make -f examples/Makefile-simulation check
-    - uses: actions/upload-artifact@v2
+        ./script/test cert_suite ./tests/scripts/thread-cert/Cert_*.py ./tests/scripts/thread-cert/test_*.py
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       if: ${{ failure() }}
       with:
         name: cli-ftd-thread-cert
-        path: build/simulation/tests/scripts/thread-cert
+        path: ot_testing
     - name: Generate Coverage
       run: |
         ./script/test generate_coverage gcc
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       with:
         name: cov-cli-ftd
         path: tmp/coverage.info
@@ -164,30 +152,34 @@ jobs:
       VIRTUAL_TIME: 1
       MESSAGE_USE_HEAP: ${{ matrix.message_use_heap }}
     steps:
-    - uses: actions/checkout@v2
+    - name: Harden Runner
+      uses: step-security/harden-runner@eb238b55efaa70779f274895e782ed17c84f2895 # v2.6.1
+      with:
+        egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       with:
         submodules: true
     - name: Bootstrap
       run: |
         sudo rm /etc/apt/sources.list.d/* && sudo apt-get update
-        sudo apt-get --no-install-recommends install -y g++-multilib python3-setuptools python3-wheel lcov
+        sudo apt-get --no-install-recommends install -y lcov ninja-build g++-multilib python3-setuptools python3-wheel
         python3 -m pip install -r tests/scripts/thread-cert/requirements.txt
     - name: Build
       run: |
-        ./bootstrap
-        make -f examples/Makefile-simulation
+        ./script/test build
     - name: Run
       run: |
-        VERBOSE=1 make -f examples/Makefile-simulation check
-    - uses: actions/upload-artifact@v2
+        ./script/test cert_suite ./tests/scripts/thread-cert/Cert_*.py ./tests/scripts/thread-cert/test_*.py
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       if: ${{ failure() }}
       with:
         name: cli-mtd-thread-cert
-        path: build/simulation/tests/scripts/thread-cert
+        path: ot_testing
     - name: Generate Coverage
       run: |
         ./script/test generate_coverage gcc
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       with:
         name: cov-cli-mtd-${{ matrix.message_use_heap }}
         path: tmp/coverage.info
@@ -201,45 +193,53 @@ jobs:
       COVERAGE: 1
       REFERENCE_DEVICE: 1
       THREAD_VERSION: 1.1
-      TIME_SYNC: 1
       VIRTUAL_TIME: 1
     steps:
-    - uses: actions/checkout@v2
+    - name: Harden Runner
+      uses: step-security/harden-runner@eb238b55efaa70779f274895e782ed17c84f2895 # v2.6.1
+      with:
+        egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       with:
         submodules: true
     - name: Bootstrap
       run: |
         sudo rm /etc/apt/sources.list.d/* && sudo apt-get update
-        sudo apt-get --no-install-recommends install -y g++-multilib python3-setuptools python3-wheel lcov
+        sudo apt-get --no-install-recommends install -y g++-multilib lcov ninja-build python3-setuptools python3-wheel
         python3 -m pip install -r tests/scripts/thread-cert/requirements.txt
     - name: Build
       run: |
-        ./bootstrap
-        make -f examples/Makefile-simulation
+        OT_OPTIONS="-DOT_TIME_SYNC=ON" ./script/test build
     - name: Run
       run: |
-        VERBOSE=1 make -f examples/Makefile-simulation check
-    - uses: actions/upload-artifact@v2
+        ./script/test cert_suite ./tests/scripts/thread-cert/Cert_*.py ./tests/scripts/thread-cert/test_*.py
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       if: ${{ failure() }}
       with:
         name: cli-time-sync-thread-cert
-        path: build/simulation/tests/scripts/thread-cert
+        path: ot_testing
     - name: Generate Coverage
       run: |
         ./script/test generate_coverage gcc
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       with:
         name: cov-cli-time-sync
         path: tmp/coverage.info
 
   expects:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     env:
       CFLAGS: -DCLI_COAP_SECURE_USE_COAP_DEFAULT_HANDLER=1 -DOPENTHREAD_CONFIG_MLE_MAX_CHILDREN=15
       CXXFLAGS: -DCLI_COAP_SECURE_USE_COAP_DEFAULT_HANDLER=1 -DOPENTHREAD_CONFIG_MLE_MAX_CHILDREN=15
       THREAD_VERSION: 1.1
     steps:
-    - uses: actions/checkout@v2
+    - name: Harden Runner
+      uses: step-security/harden-runner@eb238b55efaa70779f274895e782ed17c84f2895 # v2.6.1
+      with:
+        egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
     - name: Bootstrap
       run: |
         sudo apt-get --no-install-recommends install -y expect ninja-build lcov socat
@@ -254,7 +254,7 @@ jobs:
           CRASHED=$(./script/test check_crash | tail -1)
           [[ $CRASHED -eq "1" ]] && echo "Crashed!" || echo "Not crashed."
           echo "CRASHED_CLI=$CRASHED" >> $GITHUB_ENV
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       if: ${{ failure() && env.CRASHED_CLI == '1' }}
       with:
         name: core-expect-cli
@@ -263,17 +263,22 @@ jobs:
     - name: Generate Coverage
       run: |
         ./script/test generate_coverage gcc
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       with:
         name: cov-expects
         path: tmp/coverage.info
 
   ot-commissioner:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       THREAD_VERSION: 1.1
     steps:
-    - uses: actions/checkout@v2
+    - name: Harden Runner
+      uses: step-security/harden-runner@eb238b55efaa70779f274895e782ed17c84f2895 # v2.6.1
+      with:
+        egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       with:
         submodules: true
     - name: Bootstrap
@@ -281,6 +286,7 @@ jobs:
         GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
       run: |
         sudo rm /etc/apt/sources.list.d/*
+        sudo apt-get update
         sudo apt-get install -y avahi-daemon avahi-utils lcov
         script/git-tool clone https://github.com/openthread/ot-commissioner.git /tmp/ot-commissioner --depth 1 --branch main
     - name: Build
@@ -306,7 +312,7 @@ jobs:
     - name: Generate Coverage
       run: |
         ./script/test generate_coverage gcc
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       with:
         name: cov-ot-commissioner
         path: tmp/coverage.info
@@ -315,35 +321,37 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       COVERAGE: 1
-      MULTIPLE_INSTANCE: 1
-      REFERENCE_DEVICE: 1
       THREAD_VERSION: 1.1
       VIRTUAL_TIME: 1
       CXXFLAGS: "-DOPENTHREAD_CONFIG_LOG_PREPEND_UPTIME=0"
     steps:
-    - uses: actions/checkout@v2
+    - name: Harden Runner
+      uses: step-security/harden-runner@eb238b55efaa70779f274895e782ed17c84f2895 # v2.6.1
+      with:
+        egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       with:
         submodules: true
     - name: Bootstrap
       run: |
-        sudo apt-get --no-install-recommends install -y python3-setuptools python3-wheel lcov
+        sudo apt-get --no-install-recommends install -y lcov ninja-build python3-setuptools python3-wheel
         python3 -m pip install -r tests/scripts/thread-cert/requirements.txt
     - name: Build
       run: |
-        ./bootstrap
-        make -f examples/Makefile-simulation
+        OT_OPTIONS="-DOT_MULTIPLE_INSTANCE=ON" ./script/test build
     - name: Run
       run: |
-        VERBOSE=1 make -f examples/Makefile-simulation check
-    - uses: actions/upload-artifact@v2
+        ./script/test cert_suite ./tests/scripts/thread-cert/Cert_*.py ./tests/scripts/thread-cert/test_*.py
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       if: ${{ failure() }}
       with:
-        name: multiple-instance-thread-cert
+        name: ot_testing
         path: build/simulation/tests/scripts/thread-cert
     - name: Generate Coverage
       run: |
         ./script/test generate_coverage gcc
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       with:
         name: cov-multiple-instance
         path: tmp/coverage.info
@@ -359,20 +367,25 @@ jobs:
     - multiple-instance
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v2
+    - name: Harden Runner
+      uses: step-security/harden-runner@eb238b55efaa70779f274895e782ed17c84f2895 # v2.6.1
+      with:
+        egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       with:
         submodules: true
     - name: Bootstrap
       run: |
         sudo apt-get --no-install-recommends install -y lcov
-    - uses: actions/download-artifact@v2
+    - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
       with:
         path: coverage/
     - name: Combine Coverage
       run: |
         script/test combine_coverage
     - name: Upload Coverage
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # v3.1.4
       with:
         files: final.info
         fail_ci_if_error: true
@@ -381,7 +394,12 @@ jobs:
     needs: upload-coverage
     runs-on: ubuntu-20.04
     steps:
-    - uses: geekyeggo/delete-artifact@1-glob-support
+    - name: Harden Runner
+      uses: step-security/harden-runner@eb238b55efaa70779f274895e782ed17c84f2895 # v2.6.1
+      with:
+        egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+    - uses: geekyeggo/delete-artifact@54ab544f12cdb7b71613a16a2b5a37a9ade990af # v2.0.0
       with:
         name: cov-*
         useGlob: true

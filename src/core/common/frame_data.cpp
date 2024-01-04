@@ -38,17 +38,14 @@
 
 namespace ot {
 
-Error FrameData::ReadUint8(uint8_t &aUint8)
-{
-    return ReadBytes(&aUint8, sizeof(uint8_t));
-}
+Error FrameData::ReadUint8(uint8_t &aUint8) { return ReadBytes(&aUint8, sizeof(uint8_t)); }
 
 Error FrameData::ReadBigEndianUint16(uint16_t &aUint16)
 {
     Error error;
 
     SuccessOrExit(error = ReadBytes(&aUint16, sizeof(uint16_t)));
-    aUint16 = Encoding::BigEndian::HostSwap16(aUint16);
+    aUint16 = BigEndian::HostSwap16(aUint16);
 
 exit:
     return error;
@@ -59,7 +56,7 @@ Error FrameData::ReadBigEndianUint32(uint32_t &aUint32)
     Error error;
 
     SuccessOrExit(error = ReadBytes(&aUint32, sizeof(uint32_t)));
-    aUint32 = Encoding::BigEndian::HostSwap32(aUint32);
+    aUint32 = BigEndian::HostSwap32(aUint32);
 
 exit:
     return error;
@@ -70,7 +67,7 @@ Error FrameData::ReadLittleEndianUint16(uint16_t &aUint16)
     Error error;
 
     SuccessOrExit(error = ReadBytes(&aUint16, sizeof(uint16_t)));
-    aUint16 = Encoding::LittleEndian::HostSwap16(aUint16);
+    aUint16 = LittleEndian::HostSwap16(aUint16);
 
 exit:
     return error;
@@ -81,7 +78,7 @@ Error FrameData::ReadLittleEndianUint32(uint32_t &aUint32)
     Error error;
 
     SuccessOrExit(error = ReadBytes(&aUint32, sizeof(uint32_t)));
-    aUint32 = Encoding::LittleEndian::HostSwap32(aUint32);
+    aUint32 = LittleEndian::HostSwap32(aUint32);
 
 exit:
     return error;
@@ -99,9 +96,6 @@ exit:
     return error;
 }
 
-void FrameData::SkipOver(uint16_t aLength)
-{
-    Init(GetBytes() + aLength, GetLength() - aLength);
-}
+void FrameData::SkipOver(uint16_t aLength) { Init(GetBytes() + aLength, GetLength() - aLength); }
 
 } // namespace ot

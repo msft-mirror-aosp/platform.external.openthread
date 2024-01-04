@@ -36,6 +36,7 @@
 #include "platform-posix.h"
 
 #include <assert.h>
+#include <inttypes.h>
 
 #include <openthread-core-config.h>
 #include <openthread/border_router.h>
@@ -71,10 +72,7 @@ static void processStateChange(otChangedFlags aFlags, void *aContext)
 #endif
 
 #if OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
-    if (gBackboneNetifIndex != 0)
-    {
-        platformBackboneStateChange(instance, aFlags);
-    }
+    ot::Posix::InfraNetif::Get().HandleBackboneStateChange(instance, aFlags);
 #endif
 }
 #endif
@@ -120,8 +118,19 @@ static const char *getTrelRadioUrl(otPlatformConfig *aPlatformConfig)
 }
 #endif
 
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
+void otSysSetInfraNetif(const char *aInfraNetifName, int aIcmp6Socket)
+{
+    ot::Posix::InfraNetif::Get().SetInfraNetif(aInfraNetifName, aIcmp6Socket);
+}
+#endif
+
 void platformInit(otPlatformConfig *aPlatformConfig)
 {
+#if OPENTHREAD_POSIX_CONFIG_BACKTRACE_ENABLE
+    platformBacktraceInit();
+#endif
+
     platformAlarmInit(aPlatformConfig->mSpeedUpFactor, aPlatformConfig->mRealTimeSignal);
     platformRadioInit(get802154RadioUrl(aPlatformConfig));
 
@@ -133,18 +142,15 @@ void platformInit(otPlatformConfig *aPlatformConfig)
 #endif
     platformRandomInit();
 
-#if OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
-    platformBackboneInit(aPlatformConfig->mBackboneInterfaceName);
-#endif
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
+    ot::Posix::InfraNetif::Get().Init();
 
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
-    ot::Posix::InfraNetif::Get().Init(aPlatformConfig->mBackboneInterfaceName);
 #endif
 
     gNetifName[0] = '\0';
 
 #if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
-    platformNetifInit(aPlatformConfig->mInterfaceName);
+    platformNetifInit(aPlatformConfig);
 #endif
 
 #if OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE
@@ -159,15 +165,31 @@ exit:
     return;
 }
 
-void platformSetUp(void)
+void platformSetUp(otPlatformConfig *aPlatformConfig)
 {
+    OT_UNUSED_VARIABLE(aPlatformConfig);
+
     VerifyOrExit(!gDryRun);
 
-#if OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
-    platformBackboneSetUp();
-#endif
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
+    if (aPlatformConfig->mBackboneInterfaceName != nullptr && strlen(aPlatformConfig->mBackboneInterfaceName) > 0)
+    {
+        int icmp6Sock = -1;
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
+        icmp6Sock = ot::Posix::InfraNetif::CreateIcmp6Socket(aPlatformConfig->mBackboneInterfaceName);
+#endif
+
+        otSysSetInfraNetif(aPlatformConfig->mBackboneInterfaceName, icmp6Sock);
+    }
+#endif
+
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
+    if (aPlatformConfig->mBackboneInterfaceName != nullptr && strlen(aPlatformConfig->mBackboneInterfaceName) > 0)
+    {
+        otSysSetInfraNetif(aPlatformConfig->mBackboneInterfaceName,
+                           ot::Posix::InfraNetif::CreateIcmp6Socket(aPlatformConfig->mBackboneInterfaceName));
+    }
     ot::Posix::InfraNetif::Get().SetUp();
 #endif
 
@@ -201,7 +223,7 @@ otInstance *otSysInit(otPlatformConfig *aPlatformConfig)
     gInstance = otInstanceInitSingle();
     OT_ASSERT(gInstance != nullptr);
 
-    platformSetUp();
+    platformSetUp(aPlatformConfig);
 
     return gInstance;
 }
@@ -222,12 +244,8 @@ void platformTearDown(void)
     platformNetifTearDown();
 #endif
 
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
     ot::Posix::InfraNetif::Get().TearDown();
-#endif
-
-#if OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
-    platformBackboneTearDown();
 #endif
 
 exit:
@@ -254,12 +272,8 @@ void platformDeinit(void)
     platformTrelDeinit();
 #endif
 
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
+#if OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE
     ot::Posix::InfraNetif::Get().Deinit();
-#endif
-
-#if OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
-    platformBackboneDeinit();
 #endif
 
 exit:
@@ -278,31 +292,28 @@ void otSysDeinit(void)
 
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
 /**
- * This function try selecting the given file descriptors in nonblocking mode.
+ * Try selecting the given file descriptors in nonblocking mode.
  *
- * @param[in,out]   aReadFdSet   A pointer to the read file descriptors.
- * @param[in,out]   aWriteFdSet  A pointer to the write file descriptors.
- * @param[in,out]   aErrorFdSet  A pointer to the error file descriptors.
- * @param[in]       aMaxFd       The max file descriptor.
+ * @param[in,out]  aContext  A reference to the mainloop context.
  *
  * @returns The value returned from select().
  *
  */
-static int trySelect(fd_set *aReadFdSet, fd_set *aWriteFdSet, fd_set *aErrorFdSet, int aMaxFd)
+static int trySelect(otSysMainloopContext &aContext)
 {
     struct timeval timeout          = {0, 0};
-    fd_set         originReadFdSet  = *aReadFdSet;
-    fd_set         originWriteFdSet = *aWriteFdSet;
-    fd_set         originErrorFdSet = *aErrorFdSet;
+    fd_set         originReadFdSet  = aContext.mReadFdSet;
+    fd_set         originWriteFdSet = aContext.mWriteFdSet;
+    fd_set         originErrorFdSet = aContext.mErrorFdSet;
     int            rval;
 
-    rval = select(aMaxFd + 1, aReadFdSet, aWriteFdSet, aErrorFdSet, &timeout);
+    rval = select(aContext.mMaxFd + 1, &aContext.mReadFdSet, &aContext.mWriteFdSet, &aContext.mErrorFdSet, &timeout);
 
     if (rval == 0)
     {
-        *aReadFdSet  = originReadFdSet;
-        *aWriteFdSet = originWriteFdSet;
-        *aErrorFdSet = originErrorFdSet;
+        aContext.mReadFdSet  = originReadFdSet;
+        aContext.mWriteFdSet = originWriteFdSet;
+        aContext.mErrorFdSet = originErrorFdSet;
     }
 
     return rval;
@@ -315,17 +326,15 @@ void otSysMainloopUpdate(otInstance *aInstance, otSysMainloopContext *aMainloop)
 
     platformAlarmUpdateTimeout(&aMainloop->mTimeout);
 #if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
-    platformNetifUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet,
-                             &aMainloop->mMaxFd);
+    platformNetifUpdateFdSet(aMainloop);
 #endif
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
-    virtualTimeUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet, &aMainloop->mMaxFd,
-                           &aMainloop->mTimeout);
+    virtualTimeUpdateFdSet(aMainloop);
 #else
-    platformRadioUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mMaxFd, &aMainloop->mTimeout);
+    platformRadioUpdateFdSet(aMainloop);
 #endif
 #if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
-    platformTrelUpdateFdSet(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mMaxFd, &aMainloop->mTimeout);
+    platformTrelUpdateFdSet(aMainloop);
 #endif
 
     if (otTaskletsArePending(aInstance))
@@ -343,7 +352,7 @@ int otSysMainloopPoll(otSysMainloopContext *aMainloop)
     if (timerisset(&aMainloop->mTimeout))
     {
         // Make sure there are no data ready in UART
-        rval = trySelect(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet, aMainloop->mMaxFd);
+        rval = trySelect(*aMainloop);
 
         if (rval == 0)
         {
@@ -383,20 +392,17 @@ void otSysMainloopProcess(otInstance *aInstance, const otSysMainloopContext *aMa
     ot::Posix::Mainloop::Manager::Get().Process(*aMainloop);
 
 #if OPENTHREAD_POSIX_VIRTUAL_TIME
-    virtualTimeProcess(aInstance, &aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet);
+    virtualTimeProcess(aInstance, aMainloop);
 #else
-    platformRadioProcess(aInstance, &aMainloop->mReadFdSet, &aMainloop->mWriteFdSet);
+    platformRadioProcess(aInstance, aMainloop);
 #endif
 #if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
-    platformTrelProcess(aInstance, &aMainloop->mReadFdSet, &aMainloop->mWriteFdSet);
+    platformTrelProcess(aInstance, aMainloop);
 #endif
     platformAlarmProcess(aInstance);
 #if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
-    platformNetifProcess(&aMainloop->mReadFdSet, &aMainloop->mWriteFdSet, &aMainloop->mErrorFdSet);
+    platformNetifProcess(aMainloop);
 #endif
 }
 
-bool IsSystemDryRun(void)
-{
-    return gDryRun;
-}
+bool IsSystemDryRun(void) { return gDryRun; }

@@ -46,10 +46,10 @@ namespace ot {
 namespace Cli {
 
 /**
- * This class implements the SRP Server CLI interpreter.
+ * Implements the SRP Server CLI interpreter.
  *
  */
-class SrpServer : private OutputWrapper
+class SrpServer : private Output
 {
 public:
     typedef Utils::CmdLineParser::Arg Arg;
@@ -57,21 +57,25 @@ public:
     /**
      * Constructor
      *
-     * @param[in]  aOutput  The CLI console output context.
+     * @param[in]  aInstance            The OpenThread Instance.
+     * @param[in]  aOutputImplementer   An `OutputImplementer`.
      *
      */
-    explicit SrpServer(Output &aOutput)
-        : OutputWrapper(aOutput)
+    SrpServer(otInstance *aInstance, OutputImplementer &aOutputImplementer)
+        : Output(aInstance, aOutputImplementer)
     {
     }
 
     /**
-     * This method interprets a list of CLI arguments.
+     * Processes a CLI sub-command.
      *
-     * @param[in]  aArgs        A pointer to an array of command line arguments.
+     * @param[in]  aArgs     An array of command line arguments.
      *
-     * @retval  OT_ERROR_NONE  Successfully executed the CLI command.
-     * @retval  ...            Failed to execute the CLI command.
+     * @retval OT_ERROR_NONE              Successfully executed the CLI command.
+     * @retval OT_ERROR_PENDING           The CLI command was successfully started but final result is pending.
+     * @retval OT_ERROR_INVALID_COMMAND   Invalid or unknown CLI command.
+     * @retval OT_ERROR_INVALID_ARGS      Invalid arguments.
+     * @retval ...                        Error during execution of the CLI command.
      *
      */
     otError Process(Arg aArgs[]);
@@ -81,30 +85,9 @@ private:
 
     using Command = CommandEntry<SrpServer>;
 
-    otError ProcessAddrMode(Arg aArgs[]);
-    otError ProcessDomain(Arg aArgs[]);
-    otError ProcessState(Arg aArgs[]);
-    otError ProcessEnable(Arg aArgs[]);
-    otError ProcessDisable(Arg aArgs[]);
-    otError ProcessLease(Arg aArgs[]);
-    otError ProcessHost(Arg aArgs[]);
-    otError ProcessService(Arg aArgs[]);
-    otError ProcessSeqNum(Arg aArgs[]);
-    otError ProcessTtl(Arg aArgs[]);
-    otError ProcessHelp(Arg aArgs[]);
+    template <CommandId kCommandId> otError Process(Arg aArgs[]);
 
     void OutputHostAddresses(const otSrpServerHost *aHost);
-
-    static constexpr Command sCommands[] = {
-        {"addrmode", &SrpServer::ProcessAddrMode}, {"disable", &SrpServer::ProcessDisable},
-        {"domain", &SrpServer::ProcessDomain},     {"enable", &SrpServer::ProcessEnable},
-        {"help", &SrpServer::ProcessHelp},         {"host", &SrpServer::ProcessHost},
-        {"lease", &SrpServer::ProcessLease},       {"seqnum", &SrpServer::ProcessSeqNum},
-        {"service", &SrpServer::ProcessService},   {"state", &SrpServer::ProcessState},
-        {"ttl", &SrpServer::ProcessTtl},
-    };
-
-    static_assert(BinarySearch::IsSorted(sCommands), "Command Table is not sorted");
 };
 
 } // namespace Cli

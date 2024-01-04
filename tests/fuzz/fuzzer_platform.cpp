@@ -38,6 +38,7 @@
 #include <openthread/platform/entropy.h>
 #include <openthread/platform/logging.h>
 #include <openthread/platform/misc.h>
+#include <openthread/platform/multipan.h>
 #include <openthread/platform/radio.h>
 #include <openthread/platform/settings.h>
 
@@ -144,15 +145,9 @@ void FuzzerPlatformProcess(otInstance *aInstance)
     }
 }
 
-bool FuzzerPlatformResetWasRequested(void)
-{
-    return sResetWasRequested;
-}
+bool FuzzerPlatformResetWasRequested(void) { return sResetWasRequested; }
 
-uint32_t otPlatAlarmMilliGetNow(void)
-{
-    return sAlarmNow / 1000;
-}
+uint32_t otPlatAlarmMilliGetNow(void) { return sAlarmNow / 1000; }
 
 void otPlatAlarmMilliStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
 {
@@ -169,10 +164,7 @@ void otPlatAlarmMilliStop(otInstance *aInstance)
     sAlarmMilli.isRunning = false;
 }
 
-uint32_t otPlatAlarmMicroGetNow(void)
-{
-    return sAlarmNow;
-}
+uint32_t otPlatAlarmMicroGetNow(void) { return sAlarmNow; }
 
 void otPlatAlarmMicroStartAt(otInstance *aInstance, uint32_t aT0, uint32_t aDt)
 {
@@ -207,12 +199,14 @@ otError otDiagProcessCmd(otInstance *aInstance, uint8_t aArgsLength, char *aArgs
     return OT_ERROR_NOT_IMPLEMENTED;
 }
 
-void otDiagProcessCmdLine(otInstance *aInstance, const char *aString, char *aOutput, size_t aOutputMaxLen)
+otError otDiagProcessCmdLine(otInstance *aInstance, const char *aString, char *aOutput, size_t aOutputMaxLen)
 {
     OT_UNUSED_VARIABLE(aInstance);
     OT_UNUSED_VARIABLE(aString);
     OT_UNUSED_VARIABLE(aOutput);
     OT_UNUSED_VARIABLE(aOutputMaxLen);
+
+    return OT_ERROR_NOT_IMPLEMENTED;
 }
 
 void otPlatReset(otInstance *aInstance)
@@ -228,16 +222,18 @@ otPlatResetReason otPlatGetResetReason(otInstance *aInstance)
     return OT_PLAT_RESET_REASON_POWER_ON;
 }
 
-void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
+OT_TOOL_WEAK void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
 {
     OT_UNUSED_VARIABLE(aLogLevel);
     OT_UNUSED_VARIABLE(aLogRegion);
     OT_UNUSED_VARIABLE(aFormat);
 }
 
-void otPlatWakeHost(void)
-{
-}
+void otPlatWakeHost(void) {}
+
+otError otPlatMultipanGetActiveInstance(otInstance **) { return OT_ERROR_NOT_IMPLEMENTED; }
+
+otError otPlatMultipanSetActiveInstance(otInstance *, bool) { return OT_ERROR_NOT_IMPLEMENTED; }
 
 void otPlatRadioGetIeeeEui64(otInstance *aInstance, uint8_t *aIeeeEui64)
 {
@@ -264,6 +260,12 @@ void otPlatRadioSetShortAddress(otInstance *aInstance, uint16_t aShortAddress)
 }
 
 void otPlatRadioSetPromiscuous(otInstance *aInstance, bool aEnabled)
+{
+    OT_UNUSED_VARIABLE(aInstance);
+    OT_UNUSED_VARIABLE(aEnabled);
+}
+
+void otPlatRadioSetRxOnWhenIdle(otInstance *aInstance, bool aEnabled)
 {
     OT_UNUSED_VARIABLE(aInstance);
     OT_UNUSED_VARIABLE(aEnabled);
@@ -386,15 +388,9 @@ otError otPlatRadioClearSrcMatchExtEntry(otInstance *aInstance, const otExtAddre
     return OT_ERROR_NONE;
 }
 
-void otPlatRadioClearSrcMatchShortEntries(otInstance *aInstance)
-{
-    OT_UNUSED_VARIABLE(aInstance);
-}
+void otPlatRadioClearSrcMatchShortEntries(otInstance *aInstance) { OT_UNUSED_VARIABLE(aInstance); }
 
-void otPlatRadioClearSrcMatchExtEntries(otInstance *aInstance)
-{
-    OT_UNUSED_VARIABLE(aInstance);
-}
+void otPlatRadioClearSrcMatchExtEntries(otInstance *aInstance) { OT_UNUSED_VARIABLE(aInstance); }
 
 otError otPlatRadioEnergyScan(otInstance *aInstance, uint8_t aScanChannel, uint16_t aScanDuration)
 {
@@ -448,10 +444,7 @@ void otPlatSettingsInit(otInstance *aInstance, const uint16_t *aSensitiveKeys, u
     OT_UNUSED_VARIABLE(aSensitiveKeysLength);
 }
 
-void otPlatSettingsDeinit(otInstance *aInstance)
-{
-    OT_UNUSED_VARIABLE(aInstance);
-}
+void otPlatSettingsDeinit(otInstance *aInstance) { OT_UNUSED_VARIABLE(aInstance); }
 
 otError otPlatSettingsGet(otInstance *aInstance, uint16_t aKey, int aIndex, uint8_t *aValue, uint16_t *aValueLength)
 {
@@ -489,15 +482,12 @@ otError otPlatSettingsDelete(otInstance *aInstance, uint16_t aKey, int aIndex)
     return OT_ERROR_NONE;
 }
 
-void otPlatSettingsWipe(otInstance *aInstance)
-{
-    OT_UNUSED_VARIABLE(aInstance);
-}
+void otPlatSettingsWipe(otInstance *aInstance) { OT_UNUSED_VARIABLE(aInstance); }
 
 otError otPlatDiagProcess(otInstance *aInstance,
                           uint8_t     aArgsLength,
-                          char *      aArgs[],
-                          char *      aOutput,
+                          char       *aArgs[],
+                          char       *aOutput,
                           size_t      aOutputMaxLen)
 {
     OT_UNUSED_VARIABLE(aInstance);
@@ -509,25 +499,13 @@ otError otPlatDiagProcess(otInstance *aInstance,
     return OT_ERROR_INVALID_COMMAND;
 }
 
-void otPlatDiagModeSet(bool aMode)
-{
-    OT_UNUSED_VARIABLE(aMode);
-}
+void otPlatDiagModeSet(bool aMode) { OT_UNUSED_VARIABLE(aMode); }
 
-bool otPlatDiagModeGet(void)
-{
-    return false;
-}
+bool otPlatDiagModeGet(void) { return false; }
 
-void otPlatDiagChannelSet(uint8_t aChannel)
-{
-    OT_UNUSED_VARIABLE(aChannel);
-}
+void otPlatDiagChannelSet(uint8_t aChannel) { OT_UNUSED_VARIABLE(aChannel); }
 
-void otPlatDiagTxPowerSet(int8_t aTxPower)
-{
-    OT_UNUSED_VARIABLE(aTxPower);
-}
+void otPlatDiagTxPowerSet(int8_t aTxPower) { OT_UNUSED_VARIABLE(aTxPower); }
 
 void otPlatDiagRadioReceived(otInstance *aInstance, otRadioFrame *aFrame, otError aError)
 {
@@ -536,7 +514,4 @@ void otPlatDiagRadioReceived(otInstance *aInstance, otRadioFrame *aFrame, otErro
     OT_UNUSED_VARIABLE(aError);
 }
 
-void otPlatDiagAlarmCallback(otInstance *aInstance)
-{
-    OT_UNUSED_VARIABLE(aInstance);
-}
+void otPlatDiagAlarmCallback(otInstance *aInstance) { OT_UNUSED_VARIABLE(aInstance); }

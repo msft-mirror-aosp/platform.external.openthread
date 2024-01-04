@@ -32,49 +32,34 @@
  */
 
 #include "ip4_types.hpp"
-#include "ip6_address.hpp"
+
+#include "common/numeric_limits.hpp"
+#include "net/ip6_address.hpp"
 
 namespace ot {
 namespace Ip4 {
 
-Error Address::FromString(const char *aString)
+Error Address::FromString(const char *aString, char aTerminatorChar)
 {
-    constexpr char kSeperatorChar = '.';
-    constexpr char kNullChar      = '\0';
+    constexpr char kSeparatorChar = '.';
 
-    Error error = kErrorParse;
+    Error       error = kErrorParse;
+    const char *cur   = aString;
 
     for (uint8_t index = 0;; index++)
     {
-        uint16_t value         = 0;
-        uint8_t  hasFirstDigit = false;
-
-        for (char digitChar = *aString;; ++aString, digitChar = *aString)
-        {
-            if ((digitChar < '0') || (digitChar > '9'))
-            {
-                break;
-            }
-
-            value = static_cast<uint16_t>((value * 10) + static_cast<uint8_t>(digitChar - '0'));
-            VerifyOrExit(value <= NumericLimits<uint8_t>::kMax);
-            hasFirstDigit = true;
-        }
-
-        VerifyOrExit(hasFirstDigit);
-
-        mFields.m8[index] = static_cast<uint8_t>(value);
+        SuccessOrExit(StringParseUint8(cur, mFields.m8[index]));
 
         if (index == sizeof(Address) - 1)
         {
             break;
         }
 
-        VerifyOrExit(*aString == kSeperatorChar);
-        aString++;
+        VerifyOrExit(*cur == kSeparatorChar);
+        cur++;
     }
 
-    VerifyOrExit(*aString == kNullChar);
+    VerifyOrExit(*cur == aTerminatorChar);
     error = kErrorNone;
 
 exit:
@@ -85,7 +70,7 @@ void Address::ExtractFromIp6Address(uint8_t aPrefixLength, const Ip6::Address &a
 {
     // The prefix length must be 32, 40, 48, 56, 64, 96. IPv4 bytes are added
     // after the prefix, skipping over the bits 64 to 71 (byte at `kSkipIndex`)
-    // which must be set to zero. The suffix is set to zero (per RFC 6502).
+    // which must be set to zero. The suffix is set to zero (per RFC 6052).
     //
     //    +--+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
     //    |PL| 0-------------32--40--48--56--64--72--80--88--96--104---------|
@@ -109,38 +94,85 @@ void Address::ExtractFromIp6Address(uint8_t aPrefixLength, const Ip6::Address &a
 
     OT_ASSERT(Ip6::Prefix::IsValidNat64PrefixLength(aPrefixLength));
 
-    ip6Index = aPrefixLength / CHAR_BIT;
+    ip6Index = aPrefixLength / kBitsPerByte;
 
-    for (uint8_t i = 0; i < Ip4::Address::kSize; i++)
+    for (uint8_t &i : mFields.m8)
     {
         if (ip6Index == kSkipIndex)
         {
             ip6Index++;
         }
 
-        mFields.m8[i] = aIp6Address.GetBytes()[ip6Index++];
+        i = aIp6Address.GetBytes()[ip6Index++];
     }
 }
 
 void Address::SynthesizeFromCidrAndHost(const Cidr &aCidr, const uint32_t aHost)
 {
-    mFields.m32 = (aCidr.mAddress.mFields.m32 & aCidr.SubnetMask()) | (HostSwap32(aHost) & aCidr.HostMask());
+    mFields.m32 = (aCidr.mAddress.mFields.m32 & aCidr.SubnetMask()) | (BigEndian::HostSwap32(aHost) & aCidr.HostMask());
+}
+
+void Address::ToString(StringWriter &aWriter) const
+{
+    aWriter.Append("%d.%d.%d.%d", mFields.m8[0], mFields.m8[1], mFields.m8[2], mFields.m8[3]);
+}
+
+void Address::ToString(char *aBuffer, uint16_t aSize) const
+{
+    StringWriter writer(aBuffer, aSize);
+
+    ToString(writer);
 }
 
 Address::InfoString Address::ToString(void) const
 {
     InfoString string;
 
-    string.Append("%d.%d.%d.%d", mFields.m8[0], mFields.m8[1], mFields.m8[2], mFields.m8[3]);
+    ToString(string);
 
     return string;
+}
+
+Error Cidr::FromString(const char *aString)
+{
+    constexpr char     kSlashChar     = '/';
+    constexpr uint16_t kMaxCidrLength = 32;
+
+    Error       error = kErrorParse;
+    const char *cur;
+
+    SuccessOrExit(AsCoreType(&mAddress).FromString(aString, kSlashChar));
+
+    cur = StringFind(aString, kSlashChar);
+    VerifyOrExit(cur != nullptr);
+    cur++;
+
+    SuccessOrExit(StringParseUint8(cur, mLength, kMaxCidrLength));
+    VerifyOrExit(*cur == kNullChar);
+
+    error = kErrorNone;
+
+exit:
+    return error;
+}
+
+void Cidr::ToString(StringWriter &aWriter) const
+{
+    aWriter.Append("%s/%d", AsCoreType(&mAddress).ToString().AsCString(), mLength);
+}
+
+void Cidr::ToString(char *aBuffer, uint16_t aSize) const
+{
+    StringWriter writer(aBuffer, aSize);
+
+    ToString(writer);
 }
 
 Cidr::InfoString Cidr::ToString(void) const
 {
     InfoString string;
 
-    string.Append("%s/%d", AsCoreType(&mAddress).ToString().AsCString(), mLength);
+    ToString(string);
 
     return string;
 }
