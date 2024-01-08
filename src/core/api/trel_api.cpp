@@ -39,24 +39,16 @@
 
 #include "common/as_core_type.hpp"
 #include "common/code_utils.hpp"
-#include "common/instance.hpp"
+#include "instance/instance.hpp"
 
 using namespace ot;
 
-void otTrelEnable(otInstance *aInstance)
+void otTrelSetEnabled(otInstance *aInstance, bool aEnable)
 {
-    AsCoreType(aInstance).Get<Trel::Interface>().Enable();
+    AsCoreType(aInstance).Get<Trel::Interface>().SetEnabled(aEnable);
 }
 
-void otTrelDisable(otInstance *aInstance)
-{
-    AsCoreType(aInstance).Get<Trel::Interface>().Disable();
-}
-
-bool otTrelIsEnabled(otInstance *aInstance)
-{
-    return AsCoreType(aInstance).Get<Trel::Interface>().IsEnabled();
-}
+bool otTrelIsEnabled(otInstance *aInstance) { return AsCoreType(aInstance).Get<Trel::Interface>().IsEnabled(); }
 
 void otTrelInitPeerIterator(otInstance *aInstance, otTrelPeerIterator *aIterator)
 {

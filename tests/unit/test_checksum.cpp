@@ -27,9 +27,10 @@
  */
 
 #include "common/encoding.hpp"
-#include "common/instance.hpp"
 #include "common/message.hpp"
+#include "common/numeric_limits.hpp"
 #include "common/random.hpp"
+#include "instance/instance.hpp"
 #include "net/checksum.hpp"
 #include "net/icmp6.hpp"
 #include "net/ip4_types.hpp"
@@ -50,7 +51,7 @@ uint16_t CalculateChecksum(const void *aBuffer, uint16_t aLength)
 
     while (aLength >= sizeof(uint16_t))
     {
-        sum += Encoding::BigEndian::ReadUint16(bytes);
+        sum += BigEndian::ReadUint16(bytes);
         bytes += sizeof(uint16_t);
         aLength -= sizeof(uint16_t);
     }
@@ -73,7 +74,7 @@ uint16_t CalculateChecksum(const void *aBuffer, uint16_t aLength)
 uint16_t CalculateChecksum(const Ip6::Address &aSource,
                            const Ip6::Address &aDestination,
                            uint8_t             aIpProto,
-                           const Message &     aMessage)
+                           const Message      &aMessage)
 {
     // This method calculates the checksum over an IPv6 message.
     constexpr uint16_t kMaxPayload = 1024;
@@ -101,8 +102,8 @@ uint16_t CalculateChecksum(const Ip6::Address &aSource,
 
     data.mPseudoHeader.mSource        = aSource;
     data.mPseudoHeader.mDestination   = aDestination;
-    data.mPseudoHeader.mProtocol      = Encoding::BigEndian::HostSwap32(aIpProto);
-    data.mPseudoHeader.mPayloadLength = Encoding::BigEndian::HostSwap32(payloadLength);
+    data.mPseudoHeader.mProtocol      = BigEndian::HostSwap32(aIpProto);
+    data.mPseudoHeader.mPayloadLength = BigEndian::HostSwap32(payloadLength);
 
     SuccessOrQuit(aMessage.Read(aMessage.GetOffset(), data.mPayload, payloadLength));
 
@@ -112,7 +113,7 @@ uint16_t CalculateChecksum(const Ip6::Address &aSource,
 uint16_t CalculateChecksum(const Ip4::Address &aSource,
                            const Ip4::Address &aDestination,
                            uint8_t             aIpProto,
-                           const Message &     aMessage)
+                           const Message      &aMessage)
 {
     // This method calculates the checksum over an IPv4 message.
     constexpr uint16_t kMaxPayload = 1024;
@@ -140,8 +141,8 @@ uint16_t CalculateChecksum(const Ip4::Address &aSource,
 
     data.mPseudoHeader.mSource        = aSource;
     data.mPseudoHeader.mDestination   = aDestination;
-    data.mPseudoHeader.mProtocol      = Encoding::BigEndian::HostSwap16(aIpProto);
-    data.mPseudoHeader.mPayloadLength = Encoding::BigEndian::HostSwap16(payloadLength);
+    data.mPseudoHeader.mProtocol      = BigEndian::HostSwap16(aIpProto);
+    data.mPseudoHeader.mPayloadLength = BigEndian::HostSwap16(payloadLength);
 
     SuccessOrQuit(aMessage.Read(aMessage.GetOffset(), data.mPayload, payloadLength));
 
@@ -160,7 +161,7 @@ void CorruptMessage(Message &aMessage)
 
     SuccessOrQuit(aMessage.Read(byteOffset, byte));
 
-    bitOffset = Random::NonCrypto::GetUint8InRange(0, CHAR_BIT);
+    bitOffset = Random::NonCrypto::GetUint8InRange(0, kBitsPerByte);
 
     byte ^= (1 << bitOffset);
 
@@ -181,7 +182,7 @@ void TestUdpMessageChecksum(void)
 
     for (uint16_t size = kMinSize; size <= kMaxSize; size++)
     {
-        Message *        message = instance->Get<Ip6::Ip6>().NewMessage(sizeof(Ip6::Udp::Header));
+        Message         *message = instance->Get<Ip6::Ip6>().NewMessage(sizeof(Ip6::Udp::Header));
         Ip6::Udp::Header udpHeader;
         Ip6::MessageInfo messageInfo;
 
@@ -190,7 +191,7 @@ void TestUdpMessageChecksum(void)
 
         // Write UDP header with a random payload.
 
-        Random::NonCrypto::FillBuffer(reinterpret_cast<uint8_t *>(&udpHeader), sizeof(udpHeader));
+        Random::NonCrypto::Fill(udpHeader);
         udpHeader.SetChecksum(0);
         message->Write(0, udpHeader);
 
@@ -249,7 +250,7 @@ void TestIcmp6MessageChecksum(void)
 
     for (uint16_t size = kMinSize; size <= kMaxSize; size++)
     {
-        Message *         message = instance->Get<Ip6::Ip6>().NewMessage(sizeof(Ip6::Icmp::Header));
+        Message          *message = instance->Get<Ip6::Ip6>().NewMessage(sizeof(Ip6::Icmp::Header));
         Ip6::Icmp::Header icmp6Header;
         Ip6::MessageInfo  messageInfo;
 
@@ -258,7 +259,7 @@ void TestIcmp6MessageChecksum(void)
 
         // Write ICMP6 header with a random payload.
 
-        Random::NonCrypto::FillBuffer(reinterpret_cast<uint8_t *>(&icmp6Header), sizeof(icmp6Header));
+        Random::NonCrypto::Fill(icmp6Header);
         icmp6Header.SetChecksum(0);
         message->Write(0, icmp6Header);
 
@@ -324,7 +325,7 @@ void TestTcp4MessageChecksum(void)
 
     for (uint16_t size = kMinSize; size <= kMaxSize; size++)
     {
-        Message *        message = instance->Get<Ip6::Ip6>().NewMessage(sizeof(Ip4::Tcp::Header));
+        Message         *message = instance->Get<Ip6::Ip6>().NewMessage(sizeof(Ip4::Tcp::Header));
         Ip4::Tcp::Header tcpHeader;
 
         VerifyOrQuit(message != nullptr, "Ip6::NewMesssage() failed");
@@ -332,7 +333,7 @@ void TestTcp4MessageChecksum(void)
 
         // Write TCP header with a random payload.
 
-        Random::NonCrypto::FillBuffer(reinterpret_cast<uint8_t *>(&tcpHeader), sizeof(tcpHeader));
+        Random::NonCrypto::Fill(tcpHeader);
         message->Write(0, tcpHeader);
 
         if (size > sizeof(tcpHeader))
@@ -379,7 +380,7 @@ void TestUdp4MessageChecksum(void)
 
     for (uint16_t size = kMinSize; size <= kMaxSize; size++)
     {
-        Message *        message = instance->Get<Ip6::Ip6>().NewMessage(sizeof(Ip4::Udp::Header));
+        Message         *message = instance->Get<Ip6::Ip6>().NewMessage(sizeof(Ip4::Udp::Header));
         Ip4::Udp::Header udpHeader;
 
         VerifyOrQuit(message != nullptr, "Ip6::NewMesssage() failed");
@@ -387,7 +388,7 @@ void TestUdp4MessageChecksum(void)
 
         // Write UDP header with a random payload.
 
-        Random::NonCrypto::FillBuffer(reinterpret_cast<uint8_t *>(&udpHeader), sizeof(udpHeader));
+        Random::NonCrypto::Fill(udpHeader);
         udpHeader.SetChecksum(0);
         message->Write(0, udpHeader);
 
@@ -418,13 +419,13 @@ void TestUdp4MessageChecksum(void)
 void TestIcmp4MessageChecksum(void)
 {
     // A captured ICMP echo request (ping) message. Checksum field is set to zero.
-    const uint8_t kExampleIcmpMessage[] = "\x08\x00\x00\x00\x67\x2e\x00\x00\x62\xaf\xf1\x61\x00\x04\xfc\x24"
-                                          "\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17"
-                                          "\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x27"
-                                          "\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37";
-    uint16_t  kChecksumForExampleMessage = 0x5594;
-    Instance *instance                   = static_cast<Instance *>(testInitInstance());
-    Message * message                    = instance->Get<Ip6::Ip6>().NewMessage(sizeof(kExampleIcmpMessage));
+    const uint8_t kExampleIcmpMessage[]      = "\x08\x00\x00\x00\x67\x2e\x00\x00\x62\xaf\xf1\x61\x00\x04\xfc\x24"
+                                               "\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17"
+                                               "\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x27"
+                                               "\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37";
+    uint16_t      kChecksumForExampleMessage = 0x5594;
+    Instance     *instance                   = static_cast<Instance *>(testInitInstance());
+    Message      *message                    = instance->Get<Ip6::Ip6>().NewMessage(sizeof(kExampleIcmpMessage));
 
     Ip4::Address source;
     Ip4::Address dest;

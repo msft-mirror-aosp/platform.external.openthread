@@ -46,5 +46,10 @@ target_link_libraries(openthread-cli-ftd
         openthread-ftd
     PRIVATE
         ${OT_MBEDTLS}
+        ot-config-ftd
         ot-config
 )
+
+if(OT_CLI_VENDOR_TARGET)
+    target_link_libraries(openthread-cli-ftd PRIVATE ${OT_CLI_VENDOR_TARGET})
+endif()
