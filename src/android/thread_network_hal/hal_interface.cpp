@@ -62,6 +62,8 @@ HalInterface::HalInterface(const Url::Url &aRadioUrl)
     , mHalInterfaceId(0)
 {
     IgnoreError(aRadioUrl.ParseUint8("id", mHalInterfaceId));
+    memset(&mInterfaceMetrics, 0, sizeof(mInterfaceMetrics));
+    mInterfaceMetrics.mRcpInterfaceType = kSpinelInterfaceTypeVendor;
 }
 
 otError HalInterface::Init(SpinelInterface::ReceiveFrameCallback aCallback,
@@ -144,11 +146,7 @@ uint32_t HalInterface::GetBusSpeed(void) const
     return kBusSpeed;
 }
 
-otError HalInterface::HardwareReset(void)
-{
-    mThreadChip->hardwareReset();
-    return OT_ERROR_NONE;
-}
+otError HalInterface::HardwareReset(void) { return StatusToError(mThreadChip->hardwareReset()); }
 
 void HalInterface::UpdateFdSet(void *aMainloopContext)
 {
@@ -227,6 +225,12 @@ otError HalInterface::SendFrame(const uint8_t *aFrame, uint16_t aLength)
     otLogWarnPlat("[HAL] Send frame to HAL interface failed: %s", otThreadErrorToString(error));
 
 exit:
+    if (error == OT_ERROR_NONE)
+    {
+        mInterfaceMetrics.mTxFrameCount++;
+        mInterfaceMetrics.mTxFrameByteCount += aLength;
+    }
+
     return error;
 }
 
@@ -243,7 +247,7 @@ void HalInterface::ReceiveFrameCallback(const std::vector<uint8_t> &aFrame)
         {
             otLogNotePlat("[HAL] Drop the received spinel frame: %s", otThreadErrorToString(error));
             mRxFrameBuffer->DiscardFrame();
-            ExitNow();
+            ExitNow(error = OT_ERROR_NO_BUFS);
         }
     }
 
@@ -253,10 +257,16 @@ void HalInterface::ReceiveFrameCallback(const std::vector<uint8_t> &aFrame)
     }
 
 exit:
+    if (error == OT_ERROR_NONE)
+    {
+        mInterfaceMetrics.mRxFrameCount++;
+        mInterfaceMetrics.mRxFrameByteCount += aFrame.size();
+    }
+
     return;
 }
 
-otError HalInterface::StatusToError(ScopedAStatus &aStatus)
+otError HalInterface::StatusToError(const ScopedAStatus &aStatus) const
 {
     otError error = OT_ERROR_FAILED;
 
