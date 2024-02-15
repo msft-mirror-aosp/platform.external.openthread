@@ -37,10 +37,10 @@
 #if (OPENTHREAD_CONFIG_DATASET_UPDATER_ENABLE || OPENTHREAD_CONFIG_CHANNEL_MANAGER_ENABLE) && OPENTHREAD_FTD
 
 #include "common/code_utils.hpp"
-#include "common/instance.hpp"
 #include "common/locator_getters.hpp"
 #include "common/log.hpp"
 #include "common/random.hpp"
+#include "instance/instance.hpp"
 #include "meshcop/timestamp.hpp"
 
 namespace ot {
@@ -48,14 +48,12 @@ namespace MeshCoP {
 
 DatasetUpdater::DatasetUpdater(Instance &aInstance)
     : InstanceLocator(aInstance)
-    , mCallback(nullptr)
-    , mCallbackContext(nullptr)
-    , mTimer(aInstance, DatasetUpdater::HandleTimer)
+    , mTimer(aInstance)
     , mDataset(nullptr)
 {
 }
 
-Error DatasetUpdater::RequestUpdate(const Dataset::Info &aDataset, Callback aCallback, void *aContext)
+Error DatasetUpdater::RequestUpdate(const Dataset::Info &aDataset, UpdaterCallback aCallback, void *aContext)
 {
     Error    error   = kErrorNone;
     Message *message = nullptr;
@@ -71,9 +69,8 @@ Error DatasetUpdater::RequestUpdate(const Dataset::Info &aDataset, Callback aCal
 
     SuccessOrExit(error = message->Append(aDataset));
 
-    mCallback        = aCallback;
-    mCallbackContext = aContext;
-    mDataset         = message;
+    mCallback.Set(aCallback, aContext);
+    mDataset = message;
 
     mTimer.Start(1);
 
@@ -94,15 +91,7 @@ exit:
     return;
 }
 
-void DatasetUpdater::HandleTimer(Timer &aTimer)
-{
-    aTimer.Get<DatasetUpdater>().HandleTimer();
-}
-
-void DatasetUpdater::HandleTimer(void)
-{
-    PreparePendingDataset();
-}
+void DatasetUpdater::HandleTimer(void) { PreparePendingDataset(); }
 
 void DatasetUpdater::PreparePendingDataset(void)
 {
@@ -134,7 +123,7 @@ void DatasetUpdater::PreparePendingDataset(void)
     {
         uint32_t delay = kDefaultDelay;
 
-        SuccessOrExit(error = dataset.SetTlv(Tlv::kDelayTimer, delay));
+        SuccessOrExit(error = dataset.Write<DelayTimerTlv>(delay));
     }
 
     {
@@ -144,15 +133,20 @@ void DatasetUpdater::PreparePendingDataset(void)
         {
             timestamp = *Get<PendingDatasetManager>().GetTimestamp();
         }
+        else
+        {
+            timestamp.Clear();
+        }
 
         timestamp.AdvanceRandomTicks();
         dataset.SetTimestamp(Dataset::kPending, timestamp);
     }
 
     {
-        ActiveTimestampTlv *tlv = dataset.GetTlv<ActiveTimestampTlv>();
+        Timestamp timestamp = dataset.FindTlv(Tlv::kActiveTimestamp)->ReadValueAs<ActiveTimestampTlv>();
 
-        tlv->GetTimestamp().AdvanceRandomTicks();
+        timestamp.AdvanceRandomTicks();
+        dataset.SetTimestamp(Dataset::kActive, timestamp);
     }
 
     SuccessOrExit(error = Get<PendingDatasetManager>().Save(dataset));
@@ -171,10 +165,7 @@ void DatasetUpdater::Finish(Error aError)
     FreeMessage(mDataset);
     mDataset = nullptr;
 
-    if (mCallback != nullptr)
-    {
-        mCallback(aError, mCallbackContext);
-    }
+    mCallback.InvokeIfSet(aError);
 }
 
 void DatasetUpdater::HandleNotifierEvents(Events aEvents)

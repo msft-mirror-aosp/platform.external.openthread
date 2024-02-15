@@ -43,3 +43,39 @@
  *
  */
 #define OPENTHREAD_CONFIG_CLI_UART_RX_BUFFER_SIZE 3500
+
+/**
+ * Enables the default posix infrastructure interface implementation.
+ */
+#define OPENTHREAD_POSIX_CONFIG_INFRA_IF_ENABLE 1
+
+/**
+ * Disables the default posix TUN interface implementation
+ * so that we can can use the Android specific implementation.
+ */
+#define OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE 0
+
+/**
+ * Temporarily disable PLATFORM_UDP to make ot-daemon usable with the command line "ot-ctl" tool.
+ */
+// FIXME(296975198): refactor to skip posix/udp.cpp when the tunnel interface is not
+// available, instead of crash
+#define OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE 0
+
+/**
+ * Enables CLI for Thread certification.
+ */
+#define OPENTHREAD_POSIX_CONFIG_DAEMON_CLI_ENABLE 1
+
+/**
+ * @def OPENTHREAD_POSIX_CONFIG_THREAD_NETIF_DEFAULT_NAME
+ *
+ * Define the Thread default network interface name.
+ *
+ */
+#define OPENTHREAD_POSIX_CONFIG_THREAD_NETIF_DEFAULT_NAME "thread-wpan"
+
+/**
+ * Avoids killing the ot-daemon process when the infra link disappears.
+ */
+#define OPENTHREAD_POSIX_CONFIG_EXIT_ON_INFRA_NETIF_LOST_ENABLE 0

@@ -47,7 +47,9 @@ public:
     void Process(const otSysMainloopContext &aContext) override;
 
 private:
+    int  OutputFormat(const char *aFormat, ...);
     int  OutputFormatV(const char *aFormat, va_list aArguments);
+    void createListenSocketOrDie(void);
     void InitializeSessionSocket(void);
 
     int mListenSocket  = -1;

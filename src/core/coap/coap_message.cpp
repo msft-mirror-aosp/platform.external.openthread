@@ -38,9 +38,9 @@
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
 #include "common/encoding.hpp"
-#include "common/instance.hpp"
 #include "common/random.hpp"
 #include "common/string.hpp"
+#include "instance/instance.hpp"
 
 namespace ot {
 namespace Coap {
@@ -67,32 +67,26 @@ void Message::Init(Type aType, Code aCode)
     SetCode(aCode);
 }
 
-Error Message::Init(Type aType, Code aCode, const char *aUriPath)
+Error Message::Init(Type aType, Code aCode, Uri aUri)
 {
     Error error;
 
     Init(aType, aCode);
     SuccessOrExit(error = GenerateRandomToken(kDefaultTokenLength));
-    SuccessOrExit(error = AppendUriPathOptions(aUriPath));
+    SuccessOrExit(error = AppendUriPathOptions(PathForUri(aUri)));
 
 exit:
     return error;
 }
 
-Error Message::InitAsPost(const Ip6::Address &aDestination, const char *aUriPath)
+Error Message::InitAsPost(const Ip6::Address &aDestination, Uri aUri)
 {
-    return Init(aDestination.IsMulticast() ? kTypeNonConfirmable : kTypeConfirmable, kCodePost, aUriPath);
+    return Init(aDestination.IsMulticast() ? kTypeNonConfirmable : kTypeConfirmable, kCodePost, aUri);
 }
 
-bool Message::IsConfirmablePostRequest(void) const
-{
-    return IsConfirmable() && IsPostRequest();
-}
+bool Message::IsConfirmablePostRequest(void) const { return IsConfirmable() && IsPostRequest(); }
 
-bool Message::IsNonConfirmablePostRequest(void) const
-{
-    return IsNonConfirmable() && IsPostRequest();
-}
+bool Message::IsNonConfirmablePostRequest(void) const { return IsNonConfirmable() && IsPostRequest(); }
 
 void Message::Finish(void)
 {
@@ -112,7 +106,7 @@ void Message::Finish(void)
 uint8_t Message::WriteExtendedOptionField(uint16_t aValue, uint8_t *&aBuffer)
 {
     /*
-     * This method encodes a CoAP Option header field (Option Delta/Length) per
+     * Encodes a CoAP Option header field (Option Delta/Length) per
      * RFC 7252. The returned value is a 4-bit unsigned integer. Extended fields
      * (if needed) are written into the given buffer `aBuffer` and the pointer
      * would also be updated.
@@ -145,7 +139,7 @@ uint8_t Message::WriteExtendedOptionField(uint16_t aValue, uint8_t *&aBuffer)
     else
     {
         rval = kOption2ByteExtension;
-        Encoding::BigEndian::WriteUint16(aValue - kOption2ByteExtensionOffset, aBuffer);
+        BigEndian::WriteUint16(aValue - kOption2ByteExtensionOffset, aBuffer);
         aBuffer += sizeof(uint16_t);
     }
 
@@ -189,7 +183,7 @@ Error Message::AppendUintOption(uint16_t aNumber, uint32_t aValue)
     const uint8_t *value  = &buffer[0];
     uint16_t       length = sizeof(uint32_t);
 
-    Encoding::BigEndian::WriteUint32(aValue, buffer);
+    BigEndian::WriteUint32(aValue, buffer);
 
     while ((length > 0) && (value[0] == 0))
     {
@@ -225,7 +219,7 @@ exit:
 
 Error Message::ReadUriPathOptions(char (&aUriPath)[kMaxReceivedUriPath + 1]) const
 {
-    char *           curUriPath = aUriPath;
+    char            *curUriPath = aUriPath;
     Error            error      = kErrorNone;
     Option::Iterator iterator;
 
@@ -456,15 +450,9 @@ const char *Message::CodeToString(void) const
 }
 #endif // OPENTHREAD_CONFIG_COAP_API_ENABLE
 
-Message::Iterator MessageQueue::begin(void)
-{
-    return Message::Iterator(GetHead());
-}
+Message::Iterator MessageQueue::begin(void) { return Message::Iterator(GetHead()); }
 
-Message::ConstIterator MessageQueue::begin(void) const
-{
-    return Message::ConstIterator(GetHead());
-}
+Message::ConstIterator MessageQueue::begin(void) const { return Message::ConstIterator(GetHead()); }
 
 Error Option::Iterator::Init(const Message &aMessage)
 {
@@ -563,7 +551,7 @@ Error Option::Iterator::ReadOptionValue(uint64_t &aUintValue) const
 
     for (uint16_t pos = 0; pos < mOption.mLength; pos++)
     {
-        aUintValue <<= CHAR_BIT;
+        aUintValue <<= kBitsPerByte;
         aUintValue |= buffer[pos];
     }
 
@@ -604,7 +592,7 @@ Error Option::Iterator::ReadExtendedOptionField(uint16_t &aValue)
         uint16_t value16;
 
         SuccessOrExit(error = Read(sizeof(uint16_t), &value16));
-        value16 = Encoding::BigEndian::HostSwap16(value16);
+        value16 = BigEndian::HostSwap16(value16);
         aValue  = value16 + Message::kOption2ByteExtensionOffset;
     }
     else

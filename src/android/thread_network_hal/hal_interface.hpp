@@ -54,20 +54,16 @@ namespace Posix {
  * This class defines an IPC Binder interface to the Radio Co-processor (RCP).
  *
  */
-class HalInterface
+class HalInterface : public ot::Spinel::SpinelInterface
 {
 public:
     /**
      * This constructor initializes the object.
      *
-     * @param[in] aCallback         A reference to a `Callback` object.
-     * @param[in] aCallbackContext  The context pointer passed to the callback.
-     * @param[in] aFrameBuffer      A reference to a `RxFrameBuffer` object.
+     * @param[in]  aRadioUrl   Arguments parsed from radio url.
      *
      */
-    HalInterface(Spinel::SpinelInterface::ReceiveFrameCallback aCallback,
-                 void                                         *aCallbackContext,
-                 Spinel::SpinelInterface::RxFrameBuffer       &aFrameBuffer);
+    HalInterface(const Url::Url &aRadioUrl);
 
     /**
      * This destructor deinitializes the object.
@@ -80,20 +76,24 @@ public:
      *
      * @note This method should be called before reading and sending spinel frames to the interface.
      *
-     * @param[in]  aRadioUrl          Arguments parsed from radio url.
+     * @param[in] aCallback         A reference to a `Callback` object.
+     * @param[in] aCallbackContext  The context pointer passed to the callback.
+     * @param[in] aFrameBuffer      A reference to a `RxFrameBuffer` object.
      *
      * @retval OT_ERROR_NONE          The interface is initialized successfully.
      * @retval OT_ERROR_ALREADY       The interface is already initialized.
      * @retval OT_ERROR_INVALID_ARGS  The UART device or executable cannot be found or failed to open/run.
      *
      */
-    otError Init(const Url::Url &aRadioUrl);
+    otError Init(Spinel::SpinelInterface::ReceiveFrameCallback aCallback,
+                 void                                         *aCallbackContext,
+                 Spinel::SpinelInterface::RxFrameBuffer       &aFrameBuffer) override;
 
     /**
      * This method deinitializes the interface to the RCP.
      *
      */
-    void Deinit(void);
+    void Deinit(void) override;
 
     /**
      * This method encodes and sends a spinel frame to Radio Co-processor (RCP) over the socket.
@@ -107,7 +107,7 @@ public:
      * @retval OT_ERROR_FAILED   Failed to call the HAL to send the frame.
      *
      */
-    otError SendFrame(const uint8_t *aFrame, uint16_t aLength);
+    otError SendFrame(const uint8_t *aFrame, uint16_t aLength) override;
 
     /**
      * This method waits for receiving part or all of spinel frame within specified interval.
@@ -118,26 +118,23 @@ public:
      * @retval OT_ERROR_RESPONSE_TIMEOUT No spinel frame is received within @p aTimeout.
      *
      */
-    otError WaitForFrame(uint64_t aTimeoutUs);
+    otError WaitForFrame(uint64_t aTimeoutUs) override;
 
     /**
      * This method updates the file descriptor sets with file descriptors used by the radio driver.
      *
-     * @param[inout]  aReadFdSet   A reference to the read file descriptors.
-     * @param[inout]  aWriteFdSet  A reference to the write file descriptors.
-     * @param[inout]  aMaxFd       A reference to the max file descriptor.
-     * @param[inout]  aTimeout     A reference to the timeout.
+     * @param[in]   aMainloopContext  The context containing fd_sets.
      *
      */
-    void UpdateFdSet(fd_set &aReadFdSet, fd_set &aWriteFdSet, int &aMaxFd, struct timeval &aTimeout);
+    void UpdateFdSet(void *aMainloopContext) override;
 
     /**
      * This method performs radio driver processing.
      *
-     * @param[in]   aContext        The context containing fd_sets.
+     * @param[in]   aMainloopContext  The context containing fd_sets.
      *
      */
-    void Process(const RadioProcessContext &aContext);
+    void Process(const void *aMainloopContext) override;
 
     /**
      * This method returns the bus speed between the host and the radio.
@@ -145,25 +142,29 @@ public:
      * @returns   Bus speed in bits/second.
      *
      */
-    uint32_t GetBusSpeed(void) const;
+    uint32_t GetBusSpeed(void) const override;
 
     /**
-     * This method is called when RCP failure detected and resets internal states of the interface.
+     * This method hardware resets the RCP. It will be called after a software reset fails.
+     *
+     * @retval OT_ERROR_NONE            Successfully reset the RCP.
+     * @retval OT_ERROR_NOT_IMPLEMENT   The hardware reset is not implemented.
      *
      */
-    void OnRcpReset(void);
+    otError HardwareReset(void) override;
 
     /**
-     * This method is called when RCP is reset to recreate the connection with it.
-     * Intentionally empty.
+     * Returns the RCP interface metrics.
+     *
+     * @returns The RCP interface metrics.
      *
      */
-    otError ResetConnection(void) { return OT_ERROR_NONE; }
+    const otRcpInterfaceMetrics *GetRcpInterfaceMetrics(void) const override { return &mInterfaceMetrics; }
 
 private:
     void        ReceiveFrameCallback(const std::vector<uint8_t> &aFrame);
     static void BinderDeathCallback(void *aContext);
-    otError     StatusToError(::ndk::ScopedAStatus &aStatus);
+    otError     StatusToError(const ::ndk::ScopedAStatus &aStatus) const;
 
     class ThreadChipCallback : public ::aidl::android::hardware::threadnetwork::BnThreadChipCallback
     {
@@ -190,13 +191,16 @@ private:
 
     Spinel::SpinelInterface::ReceiveFrameCallback mRxFrameCallback;
     void                                         *mRxFrameContext;
-    Spinel::SpinelInterface::RxFrameBuffer       &mRxFrameBuffer;
+    Spinel::SpinelInterface::RxFrameBuffer       *mRxFrameBuffer;
+
+    otRcpInterfaceMetrics mInterfaceMetrics;
 
     std::shared_ptr<::aidl::android::hardware::threadnetwork::IThreadChip>         mThreadChip;
     std::shared_ptr<::aidl::android::hardware::threadnetwork::IThreadChipCallback> mThreadChipCallback;
 
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
     int                                  mBinderFd;
+    uint8_t                              mHalInterfaceId;
 
     // Non-copyable, intentionally not implemented.
     HalInterface(const HalInterface &);

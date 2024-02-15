@@ -38,12 +38,11 @@
 #include "common/as_core_type.hpp"
 #include "common/encoding.hpp"
 #include "common/locator_getters.hpp"
+#include "common/num_utils.hpp"
 #include "common/random.hpp"
 
 namespace ot {
 namespace Utils {
-
-using Encoding::BigEndian::HostSwap32;
 
 void PingSender::Config::SetUnspecifiedToDefault(void)
 {
@@ -90,7 +89,7 @@ PingSender::PingSender(Instance &aInstance)
     : InstanceLocator(aInstance)
     , mIdentifier(0)
     , mTargetEchoSequence(0)
-    , mTimer(aInstance, PingSender::HandleTimer)
+    , mTimer(aInstance)
     , mIcmpHandler(PingSender::HandleIcmpReceive, this)
 {
     IgnoreError(Get<Ip6::Icmp>().RegisterHandler(mIcmpHandler));
@@ -126,18 +125,19 @@ void PingSender::Stop(void)
 void PingSender::SendPing(void)
 {
     TimeMilli        now     = TimerMilli::GetNow();
-    Message *        message = nullptr;
+    Message         *message = nullptr;
     Ip6::MessageInfo messageInfo;
 
     messageInfo.SetSockAddr(mConfig.GetSource());
     messageInfo.SetPeerAddr(mConfig.GetDestination());
     messageInfo.mHopLimit          = mConfig.mHopLimit;
     messageInfo.mAllowZeroHopLimit = mConfig.mAllowZeroHopLimit;
+    messageInfo.mMulticastLoop     = mConfig.mMulticastLoop;
 
-    message = Get<Ip6::Icmp>().NewMessage(0);
+    message = Get<Ip6::Icmp>().NewMessage();
     VerifyOrExit(message != nullptr);
 
-    SuccessOrExit(message->Append(HostSwap32(now.GetValue())));
+    SuccessOrExit(message->Append(BigEndian::HostSwap32(now.GetValue())));
 
     if (mConfig.mSize > message->GetLength())
     {
@@ -168,11 +168,6 @@ exit:
     }
 }
 
-void PingSender::HandleTimer(Timer &aTimer)
-{
-    aTimer.Get<PingSender>().HandleTimer();
-}
-
 void PingSender::HandleTimer(void)
 {
     if (mConfig.mCount > 0)
@@ -185,8 +180,8 @@ void PingSender::HandleTimer(void)
     }
 }
 
-void PingSender::HandleIcmpReceive(void *               aContext,
-                                   otMessage *          aMessage,
+void PingSender::HandleIcmpReceive(void                *aContext,
+                                   otMessage           *aMessage,
                                    const otMessageInfo *aMessageInfo,
                                    const otIcmp6Header *aIcmpHeader)
 {
@@ -194,8 +189,8 @@ void PingSender::HandleIcmpReceive(void *               aContext,
                                                                 AsCoreType(aIcmpHeader));
 }
 
-void PingSender::HandleIcmpReceive(const Message &          aMessage,
-                                   const Ip6::MessageInfo & aMessageInfo,
+void PingSender::HandleIcmpReceive(const Message           &aMessage,
+                                   const Ip6::MessageInfo  &aMessageInfo,
                                    const Ip6::Icmp::Header &aIcmpHeader)
 {
     Reply    reply;
@@ -206,19 +201,18 @@ void PingSender::HandleIcmpReceive(const Message &          aMessage,
     VerifyOrExit(aIcmpHeader.GetId() == mIdentifier);
 
     SuccessOrExit(aMessage.Read(aMessage.GetOffset(), timestamp));
-    timestamp = HostSwap32(timestamp);
+    timestamp = BigEndian::HostSwap32(timestamp);
 
-    reply.mSenderAddress = aMessageInfo.GetPeerAddr();
-    reply.mRoundTripTime =
-        static_cast<uint16_t>(OT_MIN(TimerMilli::GetNow() - TimeMilli(timestamp), NumericLimits<uint16_t>::kMax));
+    reply.mSenderAddress  = aMessageInfo.GetPeerAddr();
+    reply.mRoundTripTime  = ClampToUint16(TimerMilli::GetNow() - TimeMilli(timestamp));
     reply.mSize           = aMessage.GetLength() - aMessage.GetOffset();
     reply.mSequenceNumber = aIcmpHeader.GetSequence();
     reply.mHopLimit       = aMessageInfo.GetHopLimit();
 
     mStatistics.mReceivedCount++;
     mStatistics.mTotalRoundTripTime += reply.mRoundTripTime;
-    mStatistics.mMaxRoundTripTime = OT_MAX(mStatistics.mMaxRoundTripTime, reply.mRoundTripTime);
-    mStatistics.mMinRoundTripTime = OT_MIN(mStatistics.mMinRoundTripTime, reply.mRoundTripTime);
+    mStatistics.mMaxRoundTripTime = Max(mStatistics.mMaxRoundTripTime, reply.mRoundTripTime);
+    mStatistics.mMinRoundTripTime = Min(mStatistics.mMinRoundTripTime, reply.mRoundTripTime);
 
 #if OPENTHREAD_CONFIG_OTNS_ENABLE
     Get<Utils::Otns>().EmitPingReply(aMessageInfo.GetPeerAddr(), reply.mSize, timestamp, reply.mHopLimit);

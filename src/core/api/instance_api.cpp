@@ -43,7 +43,7 @@
 
 #if !defined(OPENTHREAD_BUILD_DATETIME)
 #ifdef __ANDROID__
-#ifdef OPENTHREAD_ENABLE_ANDROID_NDK
+#ifdef OPENTHREAD_CONFIG_ANDROID_NDK_ENABLE
 #include <sys/system_properties.h>
 #else
 #include <cutils/properties.h>
@@ -58,6 +58,16 @@
 using namespace ot;
 
 #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
+#if OPENTHREAD_CONFIG_MULTIPLE_STATIC_INSTANCE_ENABLE
+otInstance *otInstanceInitMultiple(uint8_t aIdx)
+{
+    Instance *instance;
+
+    instance = Instance::InitMultiple(aIdx);
+
+    return instance;
+}
+#endif // OPENTHREAD_CONFIG_MULTIPLE_STATIC_INSTANCE_ENABLE
 otInstance *otInstanceInit(void *aInstanceBuffer, size_t *aInstanceBufferSize)
 {
     Instance *instance;
@@ -67,11 +77,10 @@ otInstance *otInstanceInit(void *aInstanceBuffer, size_t *aInstanceBufferSize)
     return instance;
 }
 #else
-otInstance *otInstanceInitSingle(void)
-{
-    return &Instance::InitSingle();
-}
+otInstance *otInstanceInitSingle(void) { return &Instance::InitSingle(); }
 #endif // #if OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
+
+uint32_t otInstanceGetId(otInstance *aInstance) { return AsCoreType(aInstance).GetId(); }
 
 bool otInstanceIsInitialized(otInstance *aInstance)
 {
@@ -83,24 +92,21 @@ bool otInstanceIsInitialized(otInstance *aInstance)
 #endif // OPENTHREAD_MTD || OPENTHREAD_FTD
 }
 
-void otInstanceFinalize(otInstance *aInstance)
-{
-    AsCoreType(aInstance).Finalize();
-}
+void otInstanceFinalize(otInstance *aInstance) { AsCoreType(aInstance).Finalize(); }
 
-void otInstanceReset(otInstance *aInstance)
-{
-    AsCoreType(aInstance).Reset();
-}
+void otInstanceReset(otInstance *aInstance) { AsCoreType(aInstance).Reset(); }
+
+#if OPENTHREAD_CONFIG_PLATFORM_BOOTLOADER_MODE_ENABLE
+otError otInstanceResetToBootloader(otInstance *aInstance) { return AsCoreType(aInstance).ResetToBootloader(); }
+#endif
 
 #if OPENTHREAD_CONFIG_UPTIME_ENABLE
-uint64_t otInstanceGetUptime(otInstance *aInstance)
-{
-    return AsCoreType(aInstance).Get<Uptime>().GetUptime();
-}
+uint64_t otInstanceGetUptime(otInstance *aInstance) { return AsCoreType(aInstance).Get<Uptime>().GetUptime(); }
 
 void otInstanceGetUptimeAsString(otInstance *aInstance, char *aBuffer, uint16_t aSize)
 {
+    AssertPointerIsNotNull(aBuffer);
+
     AsCoreType(aInstance).Get<Uptime>().GetUptime(aBuffer, aSize);
 }
 #endif
@@ -116,22 +122,13 @@ void otRemoveStateChangeCallback(otInstance *aInstance, otStateChangedCallback a
     AsCoreType(aInstance).Get<Notifier>().RemoveCallback(aCallback, aContext);
 }
 
-void otInstanceFactoryReset(otInstance *aInstance)
-{
-    AsCoreType(aInstance).FactoryReset();
-}
+void otInstanceFactoryReset(otInstance *aInstance) { AsCoreType(aInstance).FactoryReset(); }
 
-otError otInstanceErasePersistentInfo(otInstance *aInstance)
-{
-    return AsCoreType(aInstance).ErasePersistentInfo();
-}
+otError otInstanceErasePersistentInfo(otInstance *aInstance) { return AsCoreType(aInstance).ErasePersistentInfo(); }
 #endif // OPENTHREAD_MTD || OPENTHREAD_FTD
 
 #if OPENTHREAD_RADIO
-void otInstanceResetRadioStack(otInstance *aInstance)
-{
-    AsCoreType(aInstance).ResetRadioStack();
-}
+void otInstanceResetRadioStack(otInstance *aInstance) { AsCoreType(aInstance).ResetRadioStack(); }
 #endif
 
 const char *otGetVersionString(void)
@@ -154,7 +151,7 @@ const char *otGetVersionString(void)
 
 #if !defined(OPENTHREAD_BUILD_DATETIME) && defined(__ANDROID__)
 
-#ifdef OPENTHREAD_ENABLE_ANDROID_NDK
+#ifdef OPENTHREAD_CONFIG_ANDROID_NDK_ENABLE
     static char sVersion[100 + PROP_VALUE_MAX];
     char        dateTime[PROP_VALUE_MAX];
 
