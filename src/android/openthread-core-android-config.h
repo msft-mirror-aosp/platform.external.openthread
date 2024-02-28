@@ -297,4 +297,14 @@
 
 #define OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_URL_PROTOCOL_NAME "threadnetwork_hal"
 
+// Enables CLI logs for debugging
+#define OPENTHREAD_CONFIG_CLI_LOG_INPUT_OUTPUT_ENABLE 1
+#define OPENTHREAD_CONFIG_CLI_LOG_INPUT_OUTPUT_LEVEL OT_LOG_LEVEL_INFO
+
+// Enables diag commands for RF testing
+#define OPENTHREAD_CONFIG_DIAG_ENABLE 1
+
+// Enable restriction on local source to larger scope multicast forwarding
+#define OPENTHREAD_CONFIG_IP6_RESTRICT_FORWARDING_LARGER_SCOPE_MCAST_WITH_LOCAL_SRC 1
+
 #endif // OPENTHREAD_CORE_ANDROID_CONFIG_H_
