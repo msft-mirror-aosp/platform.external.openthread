@@ -102,23 +102,6 @@ genrule {
     ],
 }
 
-soong_config_module_type {
-    name: "ot_config_cc_defaults",
-    module_type: "cc_defaults",
-    config_namespace: "openthread",
-    bool_variables: ["diag"],
-    properties: ["cflags"],
-}
-
-ot_config_cc_defaults {
-    name: "ot_config_defaults",
-    soong_config_variables: {
-        diag: {
-            cflags: ["-DOPENTHREAD_CONFIG_DIAG_ENABLE=1"],
-        },
-    },
-}
-
 filegroup {
     name: "openthread_core_srcs",
     srcs: [
@@ -239,7 +222,6 @@ filegroup {
         "src/core/meshcop/dataset_manager.cpp",
         "src/core/meshcop/dataset_manager_ftd.cpp",
         "src/core/meshcop/dataset_updater.cpp",
-        "src/core/meshcop/dtls.cpp",
         "src/core/meshcop/energy_scan_client.cpp",
         "src/core/meshcop/extended_panid.cpp",
         "src/core/meshcop/joiner.cpp",
@@ -249,6 +231,7 @@ filegroup {
         "src/core/meshcop/meshcop_tlvs.cpp",
         "src/core/meshcop/network_name.cpp",
         "src/core/meshcop/panid_query_client.cpp",
+        "src/core/meshcop/secure_transport.cpp",
         "src/core/meshcop/timestamp.cpp",
         "src/core/net/checksum.cpp",
         "src/core/net/dhcp6_client.cpp",
@@ -361,6 +344,7 @@ filegroup {
         "src/cli/cli_mac_filter.cpp",
         "src/cli/cli_network_data.cpp",
         "src/cli/cli_output.cpp",
+        "src/cli/cli_ping.cpp",
         "src/cli/cli_srp_client.cpp",
         "src/cli/cli_srp_server.cpp",
         "src/cli/cli_tcp.cpp",
@@ -486,7 +470,6 @@ cc_library_static {
     apex_available: ["com.android.tethering"],
     min_sdk_version: "30",
     defaults: [
-        "ot_config_defaults",
         "ot-daemon-debuggable-cc-defaults",
         "ot_posix_cflags_defaults",
     ],
@@ -553,7 +536,6 @@ cc_library_static {
     apex_available: ["com.android.tethering"],
     min_sdk_version: "30",
     defaults: [
-        "ot_config_defaults",
         "ot-daemon-debuggable-cc-defaults",
         "ot_posix_cflags_defaults",
     ],
@@ -595,6 +577,7 @@ cc_library_static {
         "src/cli/cli_mac_filter.cpp",
         "src/cli/cli_network_data.cpp",
         "src/cli/cli_output.cpp",
+        "src/cli/cli_ping.cpp",
         "src/cli/cli_srp_client.cpp",
         "src/cli/cli_srp_server.cpp",
         "src/cli/cli_tcp.cpp",
@@ -654,6 +637,7 @@ cc_defaults {
     cflags: [
         "-DMBEDTLS_CONFIG_FILE=\"mbedtls-config.h\"",
         "-DOPENTHREAD_CONFIG_ANDROID_VERSION_HEADER_ENABLE=1",
+        "-DOPENTHREAD_CONFIG_DIAG_ENABLE=1",
         "-DOPENTHREAD_CONFIG_DNS_CLIENT_ENABLE=1",
         "-DOPENTHREAD_CONFIG_ECDSA_ENABLE=1",
         "-DOPENTHREAD_CONFIG_FILE=\"openthread-config-android-version.h\"",
