@@ -40,6 +40,7 @@ Done
 - [counters](#counters)
 - [csl](#csl)
 - [dataset](README_DATASET.md)
+- [debug](#debug)
 - [delaytimermin](#delaytimermin)
 - [detach](#detach)
 - [deviceprops](#deviceprops)
@@ -85,6 +86,7 @@ Done
 - [networkkey](#networkkey)
 - [networkname](#networkname)
 - [networktime](#networktime)
+- [nexthop](#nexthop)
 - [panid](#panid)
 - [parent](#parent)
 - [parentpriority](#parentpriority)
@@ -117,6 +119,7 @@ Done
 - [sntp](#sntp-query-sntp-server-ip-sntp-server-port)
 - [state](#state)
 - [srp](README_SRP.md)
+- [tcat](README_TCAT.md)
 - [tcp](README_TCP.md)
 - [thread](#thread-start)
 - [timeinqueue](#timeinqueue)
@@ -355,9 +358,96 @@ Done
 
 Print border agent state.
 
+Possible states are
+
+- `Stopped` : Border Agent is stopped.
+- `Started` : Border Agent is running with no active connection with external commissioner.
+- `Active` : Border Agent is running and is connected with an external commissioner.
+
 ```bash
 > ba state
 Started
+Done
+```
+
+### ba ephemeralkey
+
+Indicates if an ephemeral key is active.
+
+Requires `OPENTHREAD_CONFIG_BORDER_AGENT_EPHEMERAL_KEY_ENABLE`.
+
+```bash
+> ba ephemeralkey
+inactive
+Done
+
+> ba ephemeralkey set Z10X20g3J15w1000P60m16 1000
+Done
+
+> ba ephemeralkey
+active
+Done
+```
+
+### ba ephemeralkey set \<keystring\> \[timeout\] \[port\]
+
+Sets the ephemeral key for a given timeout duration.
+
+Requires `OPENTHREAD_CONFIG_BORDER_AGENT_EPHEMERAL_KEY_ENABLE`.
+
+The ephemeral key can be set when Border Agent is already running and is not currently connected to any external commissioner (i.e., `ba state` gives `Started`).
+
+The `keystring` string is directly used as the ephemeral PSK (excluding the trailing null `\0` character). Its length MUST be between 6 and 32, inclusive.
+
+The `timeout` is in milliseconds. If not provided or set to zero, the default value of 2 minutes will be used. If the timeout value is larger than 10 minutes, the 10 minutes timeout value will be used instead.
+
+The `port` specifies the UDP port to use with the ephemeral key. If UDP port is zero or is not provided, an ephemeral port will be used. `ba port` will give the current UDP port in use by the Border Agent.
+
+Setting the ephemeral key again before a previously set one is timed out, will replace the previous one.
+
+While the timeout interval is in effect, the ephemeral key can be used only once by an external commissioner to connect. Once the commissioner disconnects, the ephemeral key is cleared, and Border Agent reverts to using PSKc.
+
+```bash
+> ba ephemeralkey set Z10X20g3J15w1000P60m16 5000 1234
+Done
+```
+
+### ba ephemeralkey clear
+
+Cancels the ephemeral key in use if any.
+
+Requires `OPENTHREAD_CONFIG_BORDER_AGENT_EPHEMERAL_KEY_ENABLE`.
+
+Can be used to cancel a previously set ephemeral key before it is used or times out. If the Border Agent is not running or there is no ephemeral key in use, calling this function has no effect.
+
+If a commissioner is connected using the ephemeral key and is currently active, calling this method does not change its state. In this case the `ba ephemeralkey` will continue to return `active` until the commissioner disconnects.
+
+```bash
+> ba ephemeralkey clear
+Done
+```
+
+### ba ephemeralkey callback enable
+
+Enables callback from Border Agent for ephemeral key state changes.
+
+```bash
+> ba ephemeralkey callback enable
+Done
+
+> ba ephemeralkey set W10X12 5000 49155
+Done
+
+BorderAgent callback: Ephemeral key active, port:49155
+BorderAgent callback: Ephemeral key inactive
+```
+
+### ba ephemeralkey callback disable
+
+Disables callback from Border Agent for ephemeral key state changes.
+
+```bash
+> ba ephemeralkey callback disable
 Done
 ```
 
@@ -1024,29 +1114,51 @@ Set the CSL timeout in seconds.
 Done
 ```
 
-### networktime
+### debug
 
-Get the Thread network time and the time sync parameters.
+Executes a series of CLI commands to gather information about the device and thread network. This is intended for debugging.
 
-```bash
-> networktime
-Network Time:     21084154us (synchronized)
-Time Sync Period: 100s
-XTAL Threshold:   300ppm
-Done
-```
+The output will display each executed CLI command preceded by "\$", followed by the corresponding command's generated output.
 
-### networktime \<timesyncperiod\> \<xtalthreshold\>
+The generated output encompasses the following information:
 
-Set time sync parameters
+- Version
+- Current state
+- RLOC16, extended MAC address
+- Unicast and multicast IPv6 address list
+- Channel
+- PAN ID and extended PAN ID
+- Network Data
+- Partition ID
+- Leader Data
 
-- timesyncperiod: The time synchronization period, in seconds.
-- xtalthreshold: The XTAL accuracy threshold for a device to become Router-Capable device, in PPM.
+If the device is operating as FTD:
 
-```bash
-> networktime 100 300
-Done
-```
+- Child and neighbor table
+- Router table and next hop Info
+- Address cache table
+- Registered MTD child IPv6 address
+- Device properties
+
+If the device supports and acts as an SRP client:
+
+- SRP client state
+- SRP client services and host info
+
+If the device supports and acts as an SRP sever:
+
+- SRP server state and address mode
+- SRP server registered hosts and services
+
+If the device supports TREL:
+
+- TREL status and peer table
+
+If the device supports and acts as a border router:
+
+- BR state
+- BR prefixes (OMR, on-link, NAT64)
+- Discovered prefix table
 
 ### delaytimermin
 
@@ -1714,6 +1826,8 @@ Done
 
 Set the Thread Key Sequence Counter.
 
+This command is reserved for testing and demo purposes only. Changing Key Sequence Counter will render a production application non-compliant with the Thread Specification.
+
 ```bash
 > keysequence counter 10
 Done
@@ -1731,7 +1845,9 @@ Done
 
 ### keysequence guardtime \<guardtime\>
 
-Set Thread Key Switch Guard Time (in hours) 0 means Thread Key Switch immediately if key index match
+Set Thread Key Switch Guard Time (in hours).
+
+This command is reserved for testing and demo purposes only. Changing Key Switch Guard Time will render a production application non-compliant with the Thread Specification.
 
 ```bash
 > keysequence guardtime 0
@@ -2645,6 +2761,61 @@ Set the Thread Network Name.
 
 ```bash
 > networkname OpenThread
+Done
+```
+
+### networktime
+
+Get the Thread network time and the time sync parameters.
+
+```bash
+> networktime
+Network Time:     21084154us (synchronized)
+Time Sync Period: 100s
+XTAL Threshold:   300ppm
+Done
+```
+
+### networktime \<timesyncperiod\> \<xtalthreshold\>
+
+Set time sync parameters
+
+- timesyncperiod: The time synchronization period, in seconds.
+- xtalthreshold: The XTAL accuracy threshold for a device to become Router-Capable device, in PPM.
+
+```bash
+> networktime 100 300
+Done
+```
+
+### nexthop
+
+Output the table of allocated Router IDs and the current next hop (as Router ID) and path cost for each ID.
+
+```bash
+> nexthop
+| ID   |NxtHop| Cost |
++------+------+------+
+|    9 |    9 |    1 |
+|   25 |   25 |    0 |
+|   30 |   30 |    1 |
+|   46 |    - |    - |
+|   50 |   30 |    3 |
+|   60 |   30 |    2 |
+Done
+```
+
+### nexthop \<rloc16\>
+
+Get the next hop (as RLOC16) and path cost towards a given RLOC16 destination.
+
+```bash
+> nexthop 0xc000
+0xc000 cost:0
+Done
+
+nexthop 0x8001
+0x2000 cost:3
 Done
 ```
 

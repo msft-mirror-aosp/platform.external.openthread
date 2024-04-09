@@ -55,6 +55,7 @@
 #include "common/error.hpp"
 #include "common/heap_allocatable.hpp"
 #include "common/heap_array.hpp"
+#include "common/heap_data.hpp"
 #include "common/linked_list.hpp"
 #include "common/locator.hpp"
 #include "common/message.hpp"
@@ -62,6 +63,7 @@
 #include "common/pool.hpp"
 #include "common/string.hpp"
 #include "common/timer.hpp"
+#include "crypto/sha256.hpp"
 #include "net/ip6.hpp"
 #include "net/nat64_translator.hpp"
 #include "net/nd6.hpp"
@@ -88,6 +90,7 @@ public:
     typedef otBorderRoutingPrefixTableIterator PrefixTableIterator; ///< Prefix Table Iterator.
     typedef otBorderRoutingPrefixTableEntry    PrefixTableEntry;    ///< Prefix Table Entry.
     typedef otBorderRoutingRouterEntry         RouterEntry;         ///< Router Entry.
+    typedef otPdProcessedRaInfo                PdProcessedRaInfo;   ///< Data of PdProcessedRaInfo.
 
     /**
      * This constant specifies the maximum number of route prefixes that may be published by `RoutingManager`
@@ -208,7 +211,7 @@ public:
      * @returns The current Route Info Option preference.
      *
      */
-    RoutePreference GetRouteInfoOptionPreference(void) const { return mRioPreference; }
+    RoutePreference GetRouteInfoOptionPreference(void) const { return mRioAdvertiser.GetPreference(); }
 
     /**
      * Explicitly sets the preference to use when advertising Route Info Options (RIO) in Router
@@ -220,7 +223,7 @@ public:
      * @param[in] aPreference   The route preference to use.
      *
      */
-    void SetRouteInfoOptionPreference(RoutePreference aPreference);
+    void SetRouteInfoOptionPreference(RoutePreference aPreference) { mRioAdvertiser.SetPreference(aPreference); }
 
     /**
      * Clears a previously set preference value for advertised Route Info Options.
@@ -229,7 +232,23 @@ public:
      * in router/leader role and low preference when in child role.
      *
      */
-    void ClearRouteInfoOptionPreference(void);
+    void ClearRouteInfoOptionPreference(void) { mRioAdvertiser.ClearPreference(); }
+
+    /**
+     * Sets additional options to append at the end of emitted Router Advertisement (RA) messages.
+     *
+     * The content of @p aOptions is copied internally, so can be a temporary stack variable.
+     *
+     * Subsequent calls to this method will overwrite the previously set value.
+     *
+     * @param[in] aOptions   A pointer to the encoded options. Can be `nullptr` to clear.
+     * @param[in] aLength    Number of bytes in @p aOptions.
+     *
+     * @retval kErrorNone     Successfully set the extra option bytes.
+     * @retval kErrorNoBufs   Could not allocate buffer to save the buffer.
+     *
+     */
+    Error SetExtraRouterAdvertOptions(const uint8_t *aOptions, uint16_t aLength);
 
     /**
      * Gets the current preference used for published routes in Network Data.
@@ -282,7 +301,7 @@ public:
     /**
      * Returns the platform provided off-mesh-routable (OMR) prefix.
      *
-     * The prefix is extracted from the platform generated RA messages handled by `ProcessPlatfromGeneratedNd()`.
+     * The prefix is extracted from the platform generated RA messages handled by `ProcessPlatformGeneratedNd()`.
      *
      * @param[out] aPrefixInfo      A reference to where the prefix info will be output to.
      *
@@ -292,6 +311,18 @@ public:
      *
      */
     Error GetPdOmrPrefix(PrefixTableEntry &aPrefixInfo) const;
+
+    /**
+     * Returns platform generated RA message processed information.
+     *
+     * @param[out] aPdProcessedRaInfo      A reference to where the PD processed RA info will be output to.
+     *
+     * @retval kErrorNone           Successfully retrieved the Info.
+     * @retval kErrorNotFound       There are no valid RA process info on this BR.
+     * @retval kErrorInvalidState   The Border Routing Manager is not initialized yet.
+     *
+     */
+    Error GetPdProcessedRaInfo(PdProcessedRaInfo &aPdProcessedRaInfo);
 #endif
 
     /**
@@ -504,7 +535,7 @@ public:
      * @param[in] aLength       The length of the router advertisement message.
      *
      */
-    void ProcessPlatfromGeneratedRa(const uint8_t *aRouterAdvert, uint16_t aLength)
+    void ProcessPlatformGeneratedRa(const uint8_t *aRouterAdvert, uint16_t aLength)
     {
         mPdPrefixManager.ProcessPlatformGeneratedRa(aRouterAdvert, aLength);
     }
@@ -568,6 +599,15 @@ private:
     static_assert(kPolicyEvaluationMaxDelay > kPolicyEvaluationMinDelay,
                   "kPolicyEvaluationMaxDelay must be larger than kPolicyEvaluationMinDelay");
 
+    using Option                 = Ip6::Nd::Option;
+    using PrefixInfoOption       = Ip6::Nd::PrefixInfoOption;
+    using RouteInfoOption        = Ip6::Nd::RouteInfoOption;
+    using RaFlagsExtOption       = Ip6::Nd::RaFlagsExtOption;
+    using RouterAdvert           = Ip6::Nd::RouterAdvert;
+    using NeighborAdvertMessage  = Ip6::Nd::NeighborAdvertMessage;
+    using NeighborSolicitMessage = Ip6::Nd::NeighborSolicitMessage;
+    using RouterSolicitMessage   = Ip6::Nd::RouterSolicitMessage;
+
     enum RouterAdvTxMode : uint8_t // Used in `SendRouterAdvertisement()`
     {
         kInvalidateAllPrevPrefixes,
@@ -617,9 +657,8 @@ private:
     public:
         explicit DiscoveredPrefixTable(Instance &aInstance);
 
-        void ProcessRouterAdvertMessage(const Ip6::Nd::RouterAdvertMessage &aRaMessage,
-                                        const Ip6::Address                 &aSrcAddress);
-        void ProcessNeighborAdvertMessage(const Ip6::Nd::NeighborAdvertMessage &aNaMessage);
+        void ProcessRouterAdvertMessage(const RouterAdvert::RxMessage &aRaMessage, const Ip6::Address &aSrcAddress);
+        void ProcessNeighborAdvertMessage(const NeighborAdvertMessage &aNaMessage);
 
         bool ContainsDefaultOrNonUlaRoutePrefix(void) const;
         bool ContainsNonUlaOnLinkPrefix(void) const;
@@ -635,7 +674,7 @@ private:
 
         TimeMilli CalculateNextStaleTime(TimeMilli aNow) const;
 
-        void DetermineAndSetFlags(Ip6::Nd::RouterAdvertMessage &aRaMessage) const;
+        void DetermineAndSetFlags(RouterAdvert::Header &aHeader) const;
 
         void  InitIterator(PrefixTableIterator &aIterator) const;
         Error GetNextEntry(PrefixTableIterator &aIterator, PrefixTableEntry &aEntry) const;
@@ -711,9 +750,9 @@ private:
                 TimeMilli mNow;
             };
 
-            void               SetFrom(const Ip6::Nd::RouterAdvertMessage::Header &aRaHeader);
-            void               SetFrom(const Ip6::Nd::PrefixInfoOption &aPio);
-            void               SetFrom(const Ip6::Nd::RouteInfoOption &aRio);
+            void               SetFrom(const RouterAdvert::Header &aRaHeader);
+            void               SetFrom(const PrefixInfoOption &aPio);
+            void               SetFrom(const RouteInfoOption &aRio);
             Type               GetType(void) const { return mType; }
             bool               IsOnLinkPrefix(void) const { return (mType == kTypeOnLink); }
             bool               IsRoutePrefix(void) const { return (mType == kTypeRoute); }
@@ -811,10 +850,10 @@ private:
             void SetInitTime(void) { mData32 = TimerMilli::GetNow().GetValue(); }
         };
 
-        void         ProcessRaHeader(const Ip6::Nd::RouterAdvertMessage::Header &aRaHeader, Router &aRouter);
-        void         ProcessPrefixInfoOption(const Ip6::Nd::PrefixInfoOption &aPio, Router &aRouter);
-        void         ProcessRouteInfoOption(const Ip6::Nd::RouteInfoOption &aRio, Router &aRouter);
-        void         ProcessRaFlagsExtOption(const Ip6::Nd::RaFlagsExtOption &aFlagsOption, Router &aRouter);
+        void         ProcessRaHeader(const RouterAdvert::Header &aRaHeader, Router &aRouter);
+        void         ProcessPrefixInfoOption(const PrefixInfoOption &aPio, Router &aRouter);
+        void         ProcessRouteInfoOption(const RouteInfoOption &aRio, Router &aRouter);
+        void         ProcessRaFlagsExtOption(const RaFlagsExtOption &aFlagsOption, Router &aRouter);
         bool         Contains(const Entry::Checker &aChecker) const;
         void         RemovePrefix(const Entry::Matcher &aMatcher);
         void         RemoveOrDeprecateEntriesFromInactiveRouters(void);
@@ -896,7 +935,7 @@ private:
         void                    Stop(void);
         void                    Evaluate(void);
         void                    UpdateDefaultRouteFlag(bool aDefaultRoute);
-        bool                    IsLocalAddedInNetData(void) const { return mIsLocalAddedInNetData; }
+        bool                    ShouldAdvertiseLocalAsRio(void) const;
         const Ip6::Prefix      &GetGeneratedPrefix(void) const { return mGeneratedPrefix; }
         const OmrPrefix        &GetLocalPrefix(void) const { return mLocalPrefix; }
         const FavoredOmrPrefix &GetFavoredPrefix(void) const { return mFavoredPrefix; }
@@ -938,7 +977,7 @@ private:
         bool               IsInitalEvaluationDone(void) const;
         void               HandleDiscoveredPrefixTableChanged(void);
         bool               ShouldPublishUlaRoute(void) const;
-        void               AppendAsPiosTo(Ip6::Nd::RouterAdvertMessage &aRaMessage);
+        Error              AppendAsPiosTo(RouterAdvert::TxMessage &aRaMessage);
         bool               IsPublishingOrAdvertising(void) const;
         void               HandleNetDataChange(void);
         void               HandleExtPanIdChange(void);
@@ -967,8 +1006,8 @@ private:
         void  PublishAndAdvertise(void);
         void  Deprecate(void);
         void  ResetExpireTime(TimeMilli aNow);
-        void  AppendCurPrefix(Ip6::Nd::RouterAdvertMessage &aRaMessage);
-        void  AppendOldPrefixes(Ip6::Nd::RouterAdvertMessage &aRaMessage);
+        Error AppendCurPrefix(RouterAdvert::TxMessage &aRaMessage);
+        Error AppendOldPrefixes(RouterAdvert::TxMessage &aRaMessage);
         void  DeprecateOldPrefix(const Ip6::Prefix &aPrefix, TimeMilli aExpireTime);
         void  SavePrefix(const Ip6::Prefix &aPrefix, TimeMilli aExpireTime);
 
@@ -984,18 +1023,60 @@ private:
         ExpireTimer                       mTimer;
     };
 
-    typedef Ip6::Prefix OnMeshPrefix;
+    void HandleRioAdvertiserimer(void) { mRioAdvertiser.HandleTimer(); }
 
-    class OnMeshPrefixArray :
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_USE_HEAP_ENABLE
-        public Heap::Array<OnMeshPrefix>
-#else
-        public Array<OnMeshPrefix, kMaxOnMeshPrefixes>
-#endif
+    class RioAdvertiser : public InstanceLocator
     {
+        // Manages the list of prefixes advertised as RIO in emitted
+        // RA. The RIO prefixes are discovered from on-mesh prefixes in
+        // network data including OMR prefix from `OmrPrefixManager`.
+        // It also handles deprecating removed prefixes.
+
     public:
-        void Add(const OnMeshPrefix &aPrefix);
-        void MarkAsDeleted(const OnMeshPrefix &aPrefix);
+        explicit RioAdvertiser(Instance &aInstance);
+
+        RoutePreference GetPreference(void) const { return mPreference; }
+        void            SetPreference(RoutePreference aPreference);
+        void            ClearPreference(void);
+        void            HandleRoleChanged(void);
+        Error           AppendRios(RouterAdvert::TxMessage &aRaMessage);
+        Error           InvalidatPrevRios(RouterAdvert::TxMessage &aRaMessage);
+        bool            HasAdvertised(const Ip6::Prefix &aPrefix) const { return mPrefixes.ContainsMatching(aPrefix); }
+        uint16_t        GetAdvertisedRioCount(void) const { return mPrefixes.GetLength(); }
+        void            HandleTimer(void);
+
+    private:
+        static constexpr uint32_t kDeprecationTime = TimeMilli::SecToMsec(300);
+
+        struct RioPrefix : public Clearable<RioPrefix>
+        {
+            bool Matches(const Ip6::Prefix &aPrefix) const { return (mPrefix == aPrefix); }
+
+            Ip6::Prefix mPrefix;
+            bool        mIsDeprecating;
+            TimeMilli   mExpirationTime;
+        };
+
+        struct RioPrefixArray :
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_USE_HEAP_ENABLE
+            public Heap::Array<RioPrefix>
+#else
+            public Array<RioPrefix, 2 * kMaxOnMeshPrefixes>
+#endif
+        {
+            void Add(const Ip6::Prefix &aPrefix);
+        };
+
+        void  SetPreferenceBasedOnRole(void);
+        void  UpdatePreference(RoutePreference aPreference);
+        Error AppendRio(const Ip6::Prefix &aPrefix, uint32_t aRouteLifetime, RouterAdvert::TxMessage &aRaMessage);
+
+        using RioTimer = TimerMilliIn<RoutingManager, &RoutingManager::HandleRioAdvertiserimer>;
+
+        RioPrefixArray  mPrefixes;
+        RioTimer        mTimer;
+        RoutePreference mPreference;
+        bool            mUserSetPreference;
     };
 
 #if OPENTHREAD_CONFIG_NAT64_BORDER_ROUTING_ENABLE
@@ -1097,26 +1178,44 @@ private:
 
     struct RaInfo
     {
-        // Tracks info about emitted RA messages: Number of RAs sent,
-        // last tx time, header to use and whether the header is
-        // discovered from receiving RAs from the host itself. This
-        // ensures that if an entity on host is advertising certain
+        // Tracks info about emitted RA messages:
+        //
+        // - Number of RAs sent
+        // - Last RA TX time
+        // - Hashes of last TX RAs (to tell if a received RA is from
+        //   `RoutingManager` itself)
+        // - RA header to use, and
+        // - Whether the RA header is discovered from receiving RAs
+        //   from the host itself.
+        //
+        // This ensures that if an entity on host is advertising certain
         // info in its RA header (e.g., a default route), the RAs we
         // emit from `RoutingManager` also include the same header.
+
+        typedef Crypto::Sha256::Hash Hash;
+
+        static constexpr uint16_t kNumHashEntries = 5;
 
         RaInfo(void)
             : mHeaderUpdateTime(TimerMilli::GetNow())
             , mIsHeaderFromHost(false)
             , mTxCount(0)
             , mLastTxTime(TimerMilli::GetNow() - kMinDelayBetweenRtrAdvs)
+            , mLastHashIndex(0)
         {
         }
 
-        Ip6::Nd::RouterAdvertMessage::Header mHeader;
-        TimeMilli                            mHeaderUpdateTime;
-        bool                                 mIsHeaderFromHost;
-        uint32_t                             mTxCount;
-        TimeMilli                            mLastTxTime;
+        void        IncrementTxCountAndSaveHash(const InfraIf::Icmp6Packet &aRaMessage);
+        bool        IsRaFromManager(const Ip6::Nd::RouterAdvert::RxMessage &aRaMessage) const;
+        static void CalculateHash(const InfraIf::Icmp6Packet &aRaMessage, Hash &aHash);
+
+        RouterAdvert::Header mHeader;
+        TimeMilli            mHeaderUpdateTime;
+        bool                 mIsHeaderFromHost;
+        uint32_t             mTxCount;
+        TimeMilli            mLastTxTime;
+        Hash                 mHashes[kNumHashEntries];
+        uint16_t             mLastHashIndex;
     };
 
     void HandleRsSenderTimer(void) { mRsSender.HandleTimer(); }
@@ -1178,6 +1277,7 @@ private:
 
         void  ProcessPlatformGeneratedRa(const uint8_t *aRouterAdvert, uint16_t aLength);
         Error GetPrefixInfo(PrefixTableEntry &aInfo) const;
+        Error GetProcessedRaInfo(PdProcessedRaInfo &aPdProcessedRaInfo) const;
         void  HandleTimer(void) { WithdrawPrefix(); }
 
         static const char *StateToString(Dhcp6PdState aState);
@@ -1190,7 +1290,7 @@ private:
         }
 
     private:
-        Error Process(const Ip6::Nd::RouterAdvertMessage &aMessage);
+        Error Process(const RouterAdvert::RxMessage &aMessage);
         void  EvaluateStateChange(Dhcp6PdState aOldState);
         void  WithdrawPrefix(void);
         void  StartStop(bool aStart);
@@ -1199,6 +1299,9 @@ private:
 
         bool                         mEnabled;
         bool                         mIsRunning;
+        uint32_t                     mNumPlatformPioProcessed;
+        uint32_t                     mNumPlatformRaReceived;
+        TimeMilli                    mLastPlatformRaTime;
         PlatformOmrPrefixTimer       mTimer;
         DiscoveredPrefixTable::Entry mPrefix;
     };
@@ -1210,8 +1313,6 @@ private:
     void  HandleNotifierEvents(Events aEvents);
     bool  IsInitialized(void) const { return mInfraIf.IsInitialized(); }
     bool  IsEnabled(void) const { return mIsEnabled; }
-    void  SetRioPreferenceBasedOnRole(void);
-    void  UpdateRioPreference(RoutePreference aPreference);
     Error LoadOrGenerateRandomBrUlaPrefix(void);
 
     void EvaluateRoutingPolicy(void);
@@ -1225,17 +1326,16 @@ private:
     void HandleRouterAdvertisement(const InfraIf::Icmp6Packet &aPacket, const Ip6::Address &aSrcAddress);
     void HandleRouterSolicit(const InfraIf::Icmp6Packet &aPacket, const Ip6::Address &aSrcAddress);
     void HandleNeighborAdvertisement(const InfraIf::Icmp6Packet &aPacket);
-    bool ShouldProcessPrefixInfoOption(const Ip6::Nd::PrefixInfoOption &aPio, const Ip6::Prefix &aPrefix);
-    bool ShouldProcessRouteInfoOption(const Ip6::Nd::RouteInfoOption &aRio, const Ip6::Prefix &aPrefix);
+    bool ShouldProcessPrefixInfoOption(const PrefixInfoOption &aPio, const Ip6::Prefix &aPrefix);
+    bool ShouldProcessRouteInfoOption(const RouteInfoOption &aRio, const Ip6::Prefix &aPrefix);
     void UpdateDiscoveredPrefixTableOnNetDataChange(void);
     bool NetworkDataContainsOmrPrefix(const Ip6::Prefix &aPrefix) const;
     bool NetworkDataContainsUlaRoute(void) const;
-    void UpdateRouterAdvertHeader(const Ip6::Nd::RouterAdvertMessage *aRouterAdvertMessage);
-    bool IsReceivedRouterAdvertFromManager(const Ip6::Nd::RouterAdvertMessage &aRaMessage) const;
+    void UpdateRouterAdvertHeader(const RouterAdvert::RxMessage *aRouterAdvertMessage);
     void ResetDiscoveredPrefixStaleTimer(void);
 
     static bool IsValidBrUlaPrefix(const Ip6::Prefix &aBrUlaPrefix);
-    static bool IsValidOnLinkPrefix(const Ip6::Nd::PrefixInfoOption &aPio);
+    static bool IsValidOnLinkPrefix(const PrefixInfoOption &aPio);
     static bool IsValidOnLinkPrefix(const Ip6::Prefix &aOnLinkPrefix);
 
     static void LogPrefixInfoOption(const Ip6::Prefix &aPrefix, uint32_t aValidLifetime, uint32_t aPreferredLifetime);
@@ -1259,10 +1359,7 @@ private:
 
     OmrPrefixManager mOmrPrefixManager;
 
-    // List of on-mesh prefixes (discovered from Network Data) which
-    // were advertised as RIO in the last sent RA message.
-    OnMeshPrefixArray mAdvertisedPrefixes;
-
+    RioAdvertiser   mRioAdvertiser;
     RoutePreference mRioPreference;
     bool            mUserSetRioPreference;
 
@@ -1280,8 +1377,9 @@ private:
     PdPrefixManager mPdPrefixManager;
 #endif
 
-    RaInfo   mRaInfo;
-    RsSender mRsSender;
+    RaInfo     mRaInfo;
+    RsSender   mRsSender;
+    Heap::Data mExtraRaOptions;
 
     DiscoveredPrefixStaleTimer mDiscoveredPrefixStaleTimer;
     RoutingPolicyTimer         mRoutingPolicyTimer;

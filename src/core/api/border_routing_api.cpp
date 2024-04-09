@@ -75,6 +75,11 @@ void otBorderRoutingClearRouteInfoOptionPreference(otInstance *aInstance)
     AsCoreType(aInstance).Get<BorderRouter::RoutingManager>().ClearRouteInfoOptionPreference();
 }
 
+otError otBorderRoutingSetExtraRouterAdvertOptions(otInstance *aInstance, const uint8_t *aOptions, uint16_t aLength)
+{
+    return AsCoreType(aInstance).Get<BorderRouter::RoutingManager>().SetExtraRouterAdvertOptions(aOptions, aLength);
+}
+
 otRoutePreference otBorderRoutingGetRoutePreference(otInstance *aInstance)
 {
     return static_cast<otRoutePreference>(
@@ -103,6 +108,13 @@ otError otBorderRoutingGetPdOmrPrefix(otInstance *aInstance, otBorderRoutingPref
     AssertPointerIsNotNull(aPrefixInfo);
 
     return AsCoreType(aInstance).Get<BorderRouter::RoutingManager>().GetPdOmrPrefix(*aPrefixInfo);
+}
+
+otError otBorderRoutingGetPdProcessedRaInfo(otInstance *aInstance, otPdProcessedRaInfo *aPdProcessedRaInfo)
+{
+    AssertPointerIsNotNull(aPdProcessedRaInfo);
+
+    return AsCoreType(aInstance).Get<BorderRouter::RoutingManager>().GetPdProcessedRaInfo(*aPdProcessedRaInfo);
 }
 #endif
 

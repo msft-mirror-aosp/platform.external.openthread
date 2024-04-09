@@ -34,6 +34,16 @@
 #ifndef CONFIG_MISC_H_
 #define CONFIG_MISC_H_
 
+/**
+ * @addtogroup config-misc
+ *
+ * @brief
+ *   This module includes configuration variables for Miscellaneous constants.
+ *
+ * @{
+ *
+ */
+
 #include "config/coap.h"
 #include "config/srp_server.h"
 
@@ -414,9 +424,14 @@
 /**
  * @def OPENTHREAD_CONFIG_DEFAULT_SED_BUFFER_SIZE
  *
- * This setting configures the default buffer size for IPv6 datagram destined for an attached SED.
- * A Thread Router MUST be able to buffer at least one 1280-octet IPv6 datagram for an attached SED according to
- * the Thread Conformance Specification.
+ * Specifies the value used in emitted Connectivity TLV "Rx-off Child Buffer Size" field which indicates the
+ * guaranteed buffer capacity for all IPv6 datagrams destined to a given rx-off-when-idle child.
+ *
+ * Changing this config does not automatically adjust message buffers. Vendors should ensure their device can support
+ * the specified value based on the message buffer model used:
+ *  - OT internal message pool (refer to `OPENTHREAD_CONFIG_NUM_MESSAGE_BUFFERS` and `MESSAGE_BUFFER_SIZE`), or
+ *  - Heap allocated message buffers (refer to `OPENTHREAD_CONFIG_MESSAGE_USE_HEAP_ENABLE),
+ *  - Platform-specific message management (refer to`OPENTHREAD_CONFIG_PLATFORM_MESSAGE_MANAGEMENT`).
  *
  */
 #ifndef OPENTHREAD_CONFIG_DEFAULT_SED_BUFFER_SIZE
@@ -426,9 +441,11 @@
 /**
  * @def OPENTHREAD_CONFIG_DEFAULT_SED_DATAGRAM_COUNT
  *
- * This setting configures the default datagram count of 106-octet IPv6 datagram per attached SED.
- * A Thread Router MUST be able to buffer at least one 106-octet IPv6 datagram per attached SED according to
- * the Thread Conformance Specification.
+ * Specifies the value used in emitted Connectivity TLV "Rx-off Child Datagram Count" field which indicates the
+ * guaranteed queue capacity in number of IPv6 datagrams destined to a given rx-off-when-idle child.
+ *
+ * Similar to `OPENTHREAD_CONFIG_DEFAULT_SED_BUFFER_SIZE`, vendors should ensure their device can support the specified
+ * value based on the message buffer model used.
  *
  */
 #ifndef OPENTHREAD_CONFIG_DEFAULT_SED_DATAGRAM_COUNT
@@ -571,5 +588,20 @@
 #ifndef OPENTHREAD_CONFIG_OPERATIONAL_DATASET_AUTO_INIT
 #define OPENTHREAD_CONFIG_OPERATIONAL_DATASET_AUTO_INIT 0
 #endif
+
+/**
+ * @def OPENTHREAD_CONFIG_BLE_TCAT_ENABLE
+ *
+ * Define to 1 to enable TCAT over BLE support.
+ *
+ */
+#ifndef OPENTHREAD_CONFIG_BLE_TCAT_ENABLE
+#define OPENTHREAD_CONFIG_BLE_TCAT_ENABLE 0
+#endif
+
+/**
+ * @}
+ *
+ */
 
 #endif // CONFIG_MISC_H_
