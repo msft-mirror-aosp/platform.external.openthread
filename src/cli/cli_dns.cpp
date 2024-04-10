@@ -416,15 +416,15 @@ otError Dns::GetDnsConfig(Arg aArgs[], otDnsQueryConfig *&aConfig)
 
     otError error = OT_ERROR_NONE;
     bool    recursionDesired;
-    bool    nat64SynthesizedAddress;
+    bool    nat64Synth;
 
-    memset(aConfig, 0, sizeof(otDnsQueryConfig));
+    ClearAllBytes(*aConfig);
 
     VerifyOrExit(!aArgs[0].IsEmpty(), aConfig = nullptr);
 
     SuccessOrExit(error = Interpreter::ParseToIp6Address(GetInstancePtr(), aArgs[0], aConfig->mServerSockAddr.mAddress,
-                                                         nat64SynthesizedAddress));
-    if (nat64SynthesizedAddress)
+                                                         nat64Synth));
+    if (nat64Synth)
     {
         OutputFormat("Synthesized IPv6 DNS server address: ");
         OutputIp6AddressLine(aConfig->mServerSockAddr.mAddress);
@@ -679,8 +679,7 @@ template <> otError Dns::Process<Cmd("server")>(Arg aArgs[])
          * @par api_copy
          * #otDnssdUpstreamQuerySetEnabled
          */
-        error = Interpreter::GetInterpreter().ProcessEnableDisable(aArgs + 1, otDnssdUpstreamQueryIsEnabled,
-                                                                   otDnssdUpstreamQuerySetEnabled);
+        error = ProcessEnableDisable(aArgs + 1, otDnssdUpstreamQueryIsEnabled, otDnssdUpstreamQuerySetEnabled);
     }
 #endif // OPENTHREAD_CONFIG_DNS_UPSTREAM_QUERY_ENABLE
     else

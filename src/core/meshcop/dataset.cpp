@@ -159,7 +159,7 @@ Dataset::Dataset(void)
     : mUpdateTime(0)
     , mLength(0)
 {
-    memset(mTlvs, 0, sizeof(mTlvs));
+    ClearAllBytes(mTlvs);
 }
 
 void Dataset::Clear(void) { mLength = 0; }
@@ -194,14 +194,14 @@ void Dataset::ConvertTo(Info &aDatasetInfo) const
             break;
 
         case Tlv::kChannel:
-            aDatasetInfo.SetChannel(As<ChannelTlv>(cur)->GetChannel());
+            aDatasetInfo.SetChannel(cur->ReadValueAs<ChannelTlv>().GetChannel());
             break;
 
         case Tlv::kChannelMask:
         {
-            uint32_t mask = As<ChannelMaskTlv>(cur)->GetChannelMask();
+            uint32_t mask;
 
-            if (mask != 0)
+            if (As<ChannelMaskTlv>(cur)->ReadChannelMask(mask) == kErrorNone)
             {
                 aDatasetInfo.SetChannelMask(mask);
             }
@@ -251,10 +251,10 @@ void Dataset::ConvertTo(Info &aDatasetInfo) const
     }
 }
 
-void Dataset::ConvertTo(otOperationalDatasetTlvs &aDataset) const
+void Dataset::ConvertTo(Tlvs &aTlvs) const
 {
-    memcpy(aDataset.mTlvs, mTlvs, mLength);
-    aDataset.mLength = static_cast<uint8_t>(mLength);
+    memcpy(aTlvs.mTlvs, mTlvs, mLength);
+    aTlvs.mLength = static_cast<uint8_t>(mLength);
 }
 
 void Dataset::Set(Type aType, const Dataset &aDataset)
@@ -271,10 +271,10 @@ void Dataset::Set(Type aType, const Dataset &aDataset)
     mUpdateTime = aDataset.GetUpdateTime();
 }
 
-void Dataset::SetFrom(const otOperationalDatasetTlvs &aDataset)
+void Dataset::SetFrom(const Tlvs &aTlvs)
 {
-    mLength = aDataset.mLength;
-    memcpy(mTlvs, aDataset.mTlvs, mLength);
+    mLength = aTlvs.mLength;
+    memcpy(mTlvs, aTlvs.mTlvs, mLength);
 }
 
 Error Dataset::SetFrom(const Info &aDatasetInfo)
@@ -304,18 +304,18 @@ Error Dataset::SetFrom(const Info &aDatasetInfo)
 
     if (aDatasetInfo.IsChannelPresent())
     {
-        ChannelTlv tlv;
-        tlv.Init();
-        tlv.SetChannel(aDatasetInfo.GetChannel());
-        IgnoreError(WriteTlv(tlv));
+        ChannelTlvValue channelValue;
+
+        channelValue.SetChannelAndPage(aDatasetInfo.GetChannel());
+        IgnoreError(Write<ChannelTlv>(channelValue));
     }
 
     if (aDatasetInfo.IsChannelMaskPresent())
     {
-        ChannelMaskTlv tlv;
-        tlv.Init();
-        tlv.SetChannelMask(aDatasetInfo.GetChannelMask());
-        IgnoreError(WriteTlv(tlv));
+        ChannelMaskTlv::Value value;
+
+        ChannelMaskTlv::PrepareValue(value, aDatasetInfo.GetChannelMask());
+        IgnoreError(WriteTlv(Tlv::kChannelMask, value.mData, value.mLength));
     }
 
     if (aDatasetInfo.IsExtendedPanIdPresent())
@@ -527,7 +527,7 @@ Error Dataset::ApplyConfiguration(Instance &aInstance, bool *aIsNetworkKeyUpdate
         {
         case Tlv::kChannel:
         {
-            uint8_t channel = static_cast<uint8_t>(As<ChannelTlv>(cur)->GetChannel());
+            uint8_t channel = static_cast<uint8_t>(cur->ReadValueAs<ChannelTlv>().GetChannel());
 
             error = mac.SetPanChannel(channel);
 
