@@ -340,7 +340,7 @@ NcpBase::NcpBase(Instance *aInstance)
 #if OPENTHREAD_CONFIG_UDP_FORWARD_ENABLE
     otUdpForwardSetForwarder(mInstance, &NcpBase::HandleUdpForwardStream, this);
 #endif
-    otIcmp6SetEchoMode(mInstance, OT_ICMP6_ECHO_HANDLER_DISABLED);
+    otIcmp6SetEchoMode(mInstance, OT_ICMP6_ECHO_HANDLER_RLOC_ALOC_ONLY);
 #if OPENTHREAD_FTD
     otThreadRegisterNeighborTableCallback(mInstance, &NcpBase::HandleNeighborTableChanged);
 #if OPENTHREAD_CONFIG_MLE_STEERING_DATA_SET_OOB_ENABLE
@@ -1285,6 +1285,8 @@ otError NcpBase::CommandHandler_RESET(uint8_t aHeader)
 
         ResetCounters();
 
+        mEncoder.ClearNcpBuffer();
+
         SuccessOrAssert(error = WriteLastStatusFrame(SPINEL_HEADER_FLAG | SPINEL_HEADER_TX_NOTIFICATION_IID,
                                                      SPINEL_STATUS_RESET_POWER_ON));
     }
@@ -1943,6 +1945,10 @@ template <> otError NcpBase::HandlePropertyGet<SPINEL_PROP_CAPS>(void)
 
 #if OPENTHREAD_CONFIG_PLATFORM_BOOTLOADER_MODE_ENABLE
     SuccessOrExit(error = mEncoder.WriteUintPacked(SPINEL_CAP_RCP_RESET_TO_BOOTLOADER));
+#endif
+
+#if OPENTHREAD_CONFIG_PLATFORM_LOG_CRASH_DUMP_ENABLE
+    SuccessOrExit(error = mEncoder.WriteUintPacked(SPINEL_CAP_RCP_LOG_CRASH_DUMP));
 #endif
 
 #if OPENTHREAD_PLATFORM_POSIX
