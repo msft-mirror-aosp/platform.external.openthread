@@ -26,15 +26,21 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef POSIX_PLATFORM_RADIO_HPP_
-#define POSIX_PLATFORM_RADIO_HPP_
+#ifndef OT_POSIX_PLATFORM_RADIO_HPP_
+#define OT_POSIX_PLATFORM_RADIO_HPP_
 
+#include "hdlc_interface.hpp"
+#include "logger.hpp"
+#include "radio_url.hpp"
+#include "spi_interface.hpp"
+#include "vendor_interface.hpp"
 #include "common/code_utils.hpp"
 #include "lib/spinel/radio_spinel.hpp"
-#include "posix/platform/hdlc_interface.hpp"
-#include "posix/platform/radio_url.hpp"
-#include "posix/platform/spi_interface.hpp"
-#include "posix/platform/vendor_interface.hpp"
+#if OPENTHREAD_SPINEL_CONFIG_VENDOR_HOOK_ENABLE
+#ifdef OPENTHREAD_SPINEL_CONFIG_VENDOR_HOOK_HEADER
+#include OPENTHREAD_SPINEL_CONFIG_VENDOR_HOOK_HEADER
+#endif
+#endif
 
 namespace ot {
 namespace Posix {
@@ -43,9 +49,11 @@ namespace Posix {
  * Manages Thread radio.
  *
  */
-class Radio
+class Radio : public Logger<Radio>
 {
 public:
+    static const char kLogModuleName[]; ///< Module name used for logging.
+
     /**
      * Creates the radio manager.
      *
@@ -104,8 +112,12 @@ private:
 #error "No Spinel interface is specified!"
 #endif
 
-    RadioUrl                 mRadioUrl;
-    Spinel::RadioSpinel      mRadioSpinel;
+    RadioUrl mRadioUrl;
+#if OPENTHREAD_SPINEL_CONFIG_VENDOR_HOOK_ENABLE
+    Spinel::VendorRadioSpinel mRadioSpinel;
+#else
+    Spinel::RadioSpinel     mRadioSpinel;
+#endif
     Spinel::SpinelInterface *mSpinelInterface;
 
     OT_DEFINE_ALIGNED_VAR(mSpinelInterfaceRaw, kSpinelInterfaceRawSize, uint64_t);
@@ -114,4 +126,4 @@ private:
 } // namespace Posix
 } // namespace ot
 
-#endif // POSIX_PLATFORM_RADIO_HPP_
+#endif // OT_POSIX_PLATFORM_RADIO_HPP_

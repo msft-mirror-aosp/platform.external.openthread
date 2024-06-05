@@ -598,6 +598,7 @@ typedef enum
     SPINEL_NET_ROLE_CHILD    = 1,
     SPINEL_NET_ROLE_ROUTER   = 2,
     SPINEL_NET_ROLE_LEADER   = 3,
+    SPINEL_NET_ROLE_DISABLED = 4,
 } spinel_net_role_t;
 
 typedef enum
@@ -606,6 +607,7 @@ typedef enum
     SPINEL_IPV6_ICMP_PING_OFFLOAD_UNICAST_ONLY   = 1,
     SPINEL_IPV6_ICMP_PING_OFFLOAD_MULTICAST_ONLY = 2,
     SPINEL_IPV6_ICMP_PING_OFFLOAD_ALL            = 3,
+    SPINEL_IPV6_ICMP_PING_OFFLOAD_RLOC_ALOC_ONLY = 4,
 } spinel_ipv6_icmp_ping_offload_mode_t;
 
 typedef enum
@@ -2296,6 +2298,7 @@ enum
      *  SPINEL_NET_ROLE_CHILD    = 1,
      *  SPINEL_NET_ROLE_ROUTER   = 2,
      *  SPINEL_NET_ROLE_LEADER   = 3,
+     *  SPINEL_NET_ROLE_DISABLED = 4,
      *
      */
     SPINEL_PROP_NET_ROLE = SPINEL_PROP_NET__BEGIN + 3,
@@ -3455,6 +3458,7 @@ enum
      *   SPINEL_IPV6_ICMP_PING_OFFLOAD_UNICAST_ONLY   = 1
      *   SPINEL_IPV6_ICMP_PING_OFFLOAD_MULTICAST_ONLY = 2
      *   SPINEL_IPV6_ICMP_PING_OFFLOAD_ALL            = 3
+     *   SPINEL_IPV6_ICMP_PING_OFFLOAD_RLOC_ALOC_ONLY = 4
      *
      * Default value is `NET_IPV6_ICMP_PING_OFFLOAD_DISABLED`.
      *

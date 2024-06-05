@@ -12,6 +12,7 @@ Usage : `br [command] ...`
 - [nat64prefix](#nat64prefix)
 - [omrprefix](#omrprefix)
 - [onlinkprefix](#onlinkprefix)
+- [pd](#pd)
 - [prefixtable](#prefixtable)
 - [rioprf](#rioprf)
 - [routeprf](#routeprf)
@@ -33,7 +34,9 @@ disable
 enable
 omrprefix
 onlinkprefix
+pd
 prefixtable
+raoptions
 rioprf
 routeprf
 routers
@@ -176,6 +179,36 @@ fd14:1078:b3d5:b0b0:0:0::/96
 Done
 ```
 
+### pd
+
+Usage: `br pd [enable|disable]`
+
+Enable/Disable the DHCPv6 PD.
+
+```bash
+> br pd enable
+Done
+
+> br pd disable
+Done
+```
+
+Usage: `br pd state`
+
+Get the state of DHCPv6 PD.
+
+`OPENTHREAD_CONFIG_BORDER_ROUTING_DHCP6_PD_ENABLE` is required.
+
+- `disabled`: DHCPv6 PD is disabled on the border router.
+- `stopped`: DHCPv6 PD in enabled but won't try to request and publish a prefix.
+- `running`: DHCPv6 PD is enabled and will try to request and publish a prefix.
+
+```bash
+> br pd state
+running
+Done
+```
+
 ### prefixtable
 
 Usage: `br prefixtable`
@@ -200,6 +233,28 @@ Info per prefix entry:
 > br prefixtable
 prefix:fd00:1234:5678:0::/64, on-link:no, ms-since-rx:29526, lifetime:1800, route-prf:med, router:ff02:0:0:0:0:0:0:1 (M:0 O:0 Stub:1)
 prefix:1200:abba:baba:0::/64, on-link:yes, ms-since-rx:29527, lifetime:1800, preferred:1800, router:ff02:0:0:0:0:0:0:1 (M:0 O:0 Stub:1)
+Done
+```
+
+### raoptions
+
+Usage: `br raoptions <options>`
+
+Sets additional options to append at the end of emitted Router Advertisement (RA) messages. `<options>` provided as hex bytes.
+
+```bash
+> br raoptions 0400ff00020001
+Done
+```
+
+### raoptions clear
+
+Usage: `br raoptions clear`
+
+Clear any previously set additional options to append at the end of emitted Router Advertisement (RA) messages.
+
+```bash
+> br raoptions clear
 Done
 ```
 

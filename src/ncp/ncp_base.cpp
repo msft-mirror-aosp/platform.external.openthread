@@ -340,7 +340,7 @@ NcpBase::NcpBase(Instance *aInstance)
 #if OPENTHREAD_CONFIG_UDP_FORWARD_ENABLE
     otUdpForwardSetForwarder(mInstance, &NcpBase::HandleUdpForwardStream, this);
 #endif
-    otIcmp6SetEchoMode(mInstance, OT_ICMP6_ECHO_HANDLER_DISABLED);
+    otIcmp6SetEchoMode(mInstance, OT_ICMP6_ECHO_HANDLER_RLOC_ALOC_ONLY);
 #if OPENTHREAD_FTD
     otThreadRegisterNeighborTableCallback(mInstance, &NcpBase::HandleNeighborTableChanged);
 #if OPENTHREAD_CONFIG_MLE_STEERING_DATA_SET_OOB_ENABLE
@@ -1284,6 +1284,8 @@ otError NcpBase::CommandHandler_RESET(uint8_t aHeader)
         mSrcMatchEnabled[mCurCommandIid]    = false;
 
         ResetCounters();
+
+        mEncoder.ClearNcpBuffer();
 
         SuccessOrAssert(error = WriteLastStatusFrame(SPINEL_HEADER_FLAG | SPINEL_HEADER_TX_NOTIFICATION_IID,
                                                      SPINEL_STATUS_RESET_POWER_ON));

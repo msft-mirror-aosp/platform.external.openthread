@@ -536,6 +536,9 @@ template <> otError NcpBase::HandlePropertyGet<SPINEL_PROP_NET_ROLE>(void)
     switch (otThreadGetDeviceRole(mInstance))
     {
     case OT_DEVICE_ROLE_DISABLED:
+        role = SPINEL_NET_ROLE_DISABLED;
+        break;
+
     case OT_DEVICE_ROLE_DETACHED:
         role = SPINEL_NET_ROLE_DETACHED;
         break;
@@ -2069,6 +2072,9 @@ template <> otError NcpBase::HandlePropertyGet<SPINEL_PROP_IPV6_ICMP_PING_OFFLOA
     case OT_ICMP6_ECHO_HANDLER_ALL:
         mode = SPINEL_IPV6_ICMP_PING_OFFLOAD_ALL;
         break;
+    case OT_ICMP6_ECHO_HANDLER_RLOC_ALOC_ONLY:
+        mode = SPINEL_IPV6_ICMP_PING_OFFLOAD_RLOC_ALOC_ONLY;
+        break;
     };
 
     return mEncoder.WriteUint8(mode);
@@ -2095,6 +2101,9 @@ template <> otError NcpBase::HandlePropertySet<SPINEL_PROP_IPV6_ICMP_PING_OFFLOA
         break;
     case SPINEL_IPV6_ICMP_PING_OFFLOAD_ALL:
         mode = OT_ICMP6_ECHO_HANDLER_ALL;
+        break;
+    case SPINEL_IPV6_ICMP_PING_OFFLOAD_RLOC_ALOC_ONLY:
+        mode = OT_ICMP6_ECHO_HANDLER_RLOC_ALOC_ONLY;
         break;
     };
 
@@ -2266,6 +2275,7 @@ template <> otError NcpBase::HandlePropertySet<SPINEL_PROP_STREAM_NET>(void)
     // STREAM_NET requires layer 2 security.
     message = otIp6NewMessageFromBuffer(mInstance, framePtr, frameLen, nullptr);
     VerifyOrExit(message != nullptr, error = OT_ERROR_NO_BUFS);
+    otMessageSetOrigin(message, OT_MESSAGE_ORIGIN_HOST_UNTRUSTED);
 
     error = otIp6Send(mInstance, message);
 
@@ -3300,6 +3310,7 @@ template <> otError NcpBase::HandlePropertySet<SPINEL_PROP_STREAM_NET_INSECURE>(
     // STREAM_NET_INSECURE packets are not secured at layer 2.
     message = otIp6NewMessageFromBuffer(mInstance, framePtr, frameLen, &msgSettings);
     VerifyOrExit(message != nullptr, error = OT_ERROR_NO_BUFS);
+    otMessageSetOrigin(message, OT_MESSAGE_ORIGIN_HOST_UNTRUSTED);
 
     // Ensure the insecure message is forwarded using direct transmission.
     otMessageSetDirectTransmission(message, true);
