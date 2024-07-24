@@ -43,6 +43,8 @@
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
 
+#include "common/code_utils.hpp"
+
 namespace ot {
 namespace Posix {
 using ::aidl::android::hardware::threadnetwork::IThreadChip;
@@ -64,6 +66,9 @@ HalInterface::HalInterface(const Url::Url &aRadioUrl)
     IgnoreError(aRadioUrl.ParseUint8("id", mHalInterfaceId));
     memset(&mInterfaceMetrics, 0, sizeof(mInterfaceMetrics));
     mInterfaceMetrics.mRcpInterfaceType = kSpinelInterfaceTypeVendor;
+
+    VerifyOrDie(ABinderProcess_setupPolling(&mBinderFd) == ::STATUS_OK, OT_EXIT_FAILURE);
+    VerifyOrDie(mBinderFd >= 0, OT_EXIT_FAILURE);
 }
 
 otError HalInterface::Init(SpinelInterface::ReceiveFrameCallback aCallback,
@@ -72,14 +77,9 @@ otError HalInterface::Init(SpinelInterface::ReceiveFrameCallback aCallback,
 {
     static const std::string            kServicePrefix = std::string() + IThreadChip::descriptor + "/chip";
     const char                         *value;
-    binder_status_t                     binderStatus;
     ScopedAStatus                       ndkStatus;
     std::shared_ptr<ThreadChipCallback> callback;
     std::string                         serviceName = kServicePrefix + std::to_string(mHalInterfaceId);
-
-    binderStatus = ABinderProcess_setupPolling(&mBinderFd);
-    VerifyOrDie(binderStatus == ::STATUS_OK, OT_EXIT_FAILURE);
-    VerifyOrDie(mBinderFd >= 0, OT_EXIT_FAILURE);
 
     otLogInfoPlat("[HAL] Wait for getting the service %s ...", serviceName.c_str());
     mThreadChip = IThreadChip::fromBinder(::ndk::SpAIBinder(AServiceManager_waitForService(serviceName.c_str())));
@@ -118,7 +118,15 @@ void HalInterface::BinderDeathCallback(void *aContext)
     DieNow(OT_EXIT_FAILURE);
 }
 
-HalInterface::~HalInterface(void) { Deinit(); }
+HalInterface::~HalInterface(void)
+{
+    Deinit();
+
+    if (mBinderFd >= 0)
+    {
+        close(mBinderFd);
+    }
+}
 
 void HalInterface::Deinit(void)
 {
@@ -128,11 +136,6 @@ void HalInterface::Deinit(void)
         AIBinder_unlinkToDeath(mThreadChip->asBinder().get(), mDeathRecipient.get(), this);
         mThreadChip         = nullptr;
         mThreadChipCallback = nullptr;
-    }
-
-    if (mBinderFd >= 0)
-    {
-        close(mBinderFd);
     }
 
     mRxFrameCallback = nullptr;

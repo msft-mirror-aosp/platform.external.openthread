@@ -36,6 +36,7 @@ omrprefix
 onlinkprefix
 pd
 prefixtable
+raoptions
 rioprf
 routeprf
 routers
@@ -208,6 +209,18 @@ running
 Done
 ```
 
+Usage `br pd omrprefix`
+
+Get the DHCPv6 Prefix Delegation (PD) provided off-mesh-routable (OMR) prefix.
+
+`OPENTHREAD_CONFIG_BORDER_ROUTING_DHCP6_PD_ENABLE` is required.
+
+```bash
+> br pd omrprefix
+2001:db8:cafe:0:0/64 lifetime:1800 preferred:1800
+Done
+```
+
 ### prefixtable
 
 Usage: `br prefixtable`
@@ -232,6 +245,28 @@ Info per prefix entry:
 > br prefixtable
 prefix:fd00:1234:5678:0::/64, on-link:no, ms-since-rx:29526, lifetime:1800, route-prf:med, router:ff02:0:0:0:0:0:0:1 (M:0 O:0 Stub:1)
 prefix:1200:abba:baba:0::/64, on-link:yes, ms-since-rx:29527, lifetime:1800, preferred:1800, router:ff02:0:0:0:0:0:0:1 (M:0 O:0 Stub:1)
+Done
+```
+
+### raoptions
+
+Usage: `br raoptions <options>`
+
+Sets additional options to append at the end of emitted Router Advertisement (RA) messages. `<options>` provided as hex bytes.
+
+```bash
+> br raoptions 0400ff00020001
+Done
+```
+
+### raoptions clear
+
+Usage: `br raoptions clear`
+
+Clear any previously set additional options to append at the end of emitted Router Advertisement (RA) messages.
+
+```bash
+> br raoptions clear
 Done
 ```
 
@@ -316,9 +351,12 @@ Info per router:
   - M: Managed Address Config flag
   - O: Other Config flag
   - Stub: Stub Router flag (indicates whether the router is a stub router)
+- Milliseconds since last received message from this router
+- Reachability flag: A router is marked as unreachable if it fails to respond to multiple Neighbor Solicitation probes.
+- `(this BR)` is appended when the router is the local device itself.
 
 ```bash
 > br routers
-ff02:0:0:0:0:0:0:1 (M:0 O:0 Stub:1)
+ff02:0:0:0:0:0:0:1 (M:0 O:0 Stub:1) ms-since-rx:1505 reachable:yes
 Done
 ```

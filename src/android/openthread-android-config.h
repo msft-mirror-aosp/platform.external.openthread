@@ -56,11 +56,9 @@
 #define OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE 0
 
 /**
- * Temporarily disable PLATFORM_UDP to make ot-daemon usable with the command line "ot-ctl" tool.
+ * Enables platform UDP support.
  */
-// FIXME(296975198): refactor to skip posix/udp.cpp when the tunnel interface is not
-// available, instead of crash
-#define OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE 0
+#define OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE 1
 
 /**
  * Enables CLI for Thread certification.
@@ -79,3 +77,34 @@
  * Avoids killing the ot-daemon process when the infra link disappears.
  */
 #define OPENTHREAD_POSIX_CONFIG_EXIT_ON_INFRA_NETIF_LOST_ENABLE 0
+
+/**
+ * Enables the posix platform to support power calibration.
+ *
+ * This flag is needed by the framework API `setChannelTargetPower()` to set the target power of each channel.
+ */
+#define OPENTHREAD_CONFIG_PLATFORM_POWER_CALIBRATION_ENABLE 1
+
+// Enable the configuration file support for power calibration.
+#define OPENTHREAD_POSIX_CONFIG_CONFIGURATION_FILE_ENABLE 1
+
+// Disable the max power table support, this feature is supported by
+// OPENTHREAD_POSIX_CONFIG_CONFIGURATION_FILE_ENABLE and
+// OPENTHREAD_CONFIG_PLATFORM_POWER_CALIBRATION_ENABLE.
+#define OPENTHREAD_POSIX_CONFIG_MAX_POWER_TABLE_ENABLE 0
+
+// Enable the spinel vendor interface to adopt the HAL-based RCP.
+#define OPENTHREAD_POSIX_CONFIG_SPINEL_VENDOR_INTERFACE_ENABLE 1
+
+// Using packet filtering in OT core instead of the iptables-based firewall feature.
+#define OPENTHREAD_POSIX_CONFIG_FIREWALL_ENABLE 0
+
+// Disable the feature to add external routes to POSIX kernel when external routes are changed in
+// netdata.
+#define OPENTHREAD_POSIX_CONFIG_INSTALL_EXTERNAL_ROUTES_ENABLE 0
+
+// Disable backtrace support as Android already has support for dumping backtrace after crash.
+#define OPENTHREAD_POSIX_CONFIG_BACKTRACE_ENABLE 0
+
+// Enable for Android platform.
+#define OPENTHREAD_POSIX_CONFIG_ANDROID_ENABLE 1

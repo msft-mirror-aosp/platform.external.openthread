@@ -69,9 +69,11 @@ add_library(openthread-simulation
     flash.c
     infra_if.c
     logging.c
+    mdns_socket.c
     misc.c
     multipan.c
     radio.c
+    simul_utils.c
     spi-stubs.c
     system.c
     trel.c

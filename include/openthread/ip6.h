@@ -236,7 +236,6 @@ typedef struct otMessageInfo
     otIp6Address mPeerAddr; ///< The peer IPv6 address.
     uint16_t     mSockPort; ///< The local transport-layer port.
     uint16_t     mPeerPort; ///< The peer transport-layer port.
-    const void  *mLinkInfo; ///< A pointer to link-specific information.
     uint8_t      mHopLimit; ///< The IPv6 Hop Limit value. Only applies if `mAllowZeroHopLimit` is FALSE.
                             ///< If `0`, IPv6 Hop Limit is default value `OPENTHREAD_CONFIG_IP6_HOP_LIMIT_DEFAULT`.
                             ///< Otherwise, specifies the IPv6 Hop Limit.
@@ -381,27 +380,6 @@ otError otIp6UnsubscribeMulticastAddress(otInstance *aInstance, const otIp6Addre
  *
  */
 const otNetifMulticastAddress *otIp6GetMulticastAddresses(otInstance *aInstance);
-
-/**
- * Checks if multicast promiscuous mode is enabled on the Thread interface.
- *
- * @param[in]  aInstance A pointer to an OpenThread instance.
- *
- * @sa otIp6SetMulticastPromiscuousEnabled
- *
- */
-bool otIp6IsMulticastPromiscuousEnabled(otInstance *aInstance);
-
-/**
- * Enables or disables multicast promiscuous mode on the Thread interface.
- *
- * @param[in]  aInstance  A pointer to an OpenThread instance.
- * @param[in]  aEnabled   TRUE to enable Multicast Promiscuous mode, FALSE otherwise.
- *
- * @sa otIp6IsMulticastPromiscuousEnabled
- *
- */
-void otIp6SetMulticastPromiscuousEnabled(otInstance *aInstance, bool aEnabled);
 
 /**
  * Allocate a new message buffer for sending an IPv6 message.
