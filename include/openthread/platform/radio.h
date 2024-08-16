@@ -648,6 +648,10 @@ void otPlatRadioSetPromiscuous(otInstance *aInstance, bool aEnable);
  * If a platform supports `OT_RADIO_CAPS_RX_ON_WHEN_IDLE` it must also support `OT_RADIO_CAPS_CSMA_BACKOFF` and handle
  * idle periods after CCA as described above.
  *
+ * Upon the transition of the "RxOnWhenIdle" flag from TRUE to FALSE, the radio platform should enter sleep mode.
+ * If the radio is currently in receive mode, it should enter sleep mode immediately. Otherwise, it should enter sleep
+ * mode after the current operation is completed.
+ *
  * @param[in]  aInstance    The OpenThread instance structure.
  * @param[in]  aEnable      TRUE to keep radio in Receive state, FALSE to put to Sleep state during idle periods.
  *
@@ -732,6 +736,17 @@ uint64_t otPlatRadioGetNow(otInstance *aInstance);
  *
  */
 uint32_t otPlatRadioGetBusSpeed(otInstance *aInstance);
+
+/**
+ * Get the bus latency in microseconds between the host and the radio chip.
+ *
+ * @param[in]   aInstance    A pointer to an OpenThread instance.
+ *
+ * @returns The bus latency in microseconds between the host and the radio chip.
+ *          Return 0 when the MAC and above layer and Radio layer resides on the same chip.
+ *
+ */
+uint32_t otPlatRadioGetBusLatency(otInstance *aInstance);
 
 /**
  * @}
@@ -978,6 +993,14 @@ otError otPlatRadioEnergyScan(otInstance *aInstance, uint8_t aScanChannel, uint1
  *
  */
 extern void otPlatRadioEnergyScanDone(otInstance *aInstance, int8_t aEnergyScanMaxRssi);
+
+/**
+ * The radio driver calls this method to notify OpenThread that the spinel bus latency has been changed.
+ *
+ * @param[in]  aInstance  The OpenThread instance structure.
+ *
+ */
+extern void otPlatRadioBusLatencyChanged(otInstance *aInstance);
 
 /**
  * Enable/Disable source address match feature.
