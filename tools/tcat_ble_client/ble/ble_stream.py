@@ -91,7 +91,3 @@ class BleStream:
         self.__receive_buffer = self.__receive_buffer[bufsize:]
         logger.debug(f'retrieved {message}')
         return message
-
-    async def disconnect(self):
-        if self.client.is_connected:
-            await self.client.disconnect()

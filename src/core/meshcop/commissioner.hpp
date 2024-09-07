@@ -440,8 +440,8 @@ private:
                                               Error                aResult);
     void HandleLeaderKeepAliveResponse(Coap::Message *aMessage, const Ip6::MessageInfo *aMessageInfo, Error aResult);
 
-    static void HandleSecureAgentConnectEvent(SecureTransport::ConnectEvent aEvent, void *aContext);
-    void        HandleSecureAgentConnectEvent(SecureTransport::ConnectEvent aEvent);
+    static void HandleSecureAgentConnected(bool aConnected, void *aContext);
+    void        HandleSecureAgentConnected(bool aConnected);
 
     template <Uri kUri> void HandleTmf(Coap::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 

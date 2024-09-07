@@ -166,7 +166,7 @@ void MeshForwarder::HandleResolved(const Ip6::Address &aEid, Error aError)
         {
             LogMessage(kMessageDrop, message, kErrorAddressQuery);
             FinalizeMessageDirectTx(message, kErrorAddressQuery);
-            RemoveMessageIfNoPendingTx(message);
+            mSendQueue.DequeueAndFree(message);
             continue;
         }
 
@@ -266,37 +266,49 @@ exit:
     return error;
 }
 
-void MeshForwarder::RemoveMessagesForChild(Child &aChild, MessageChecker &aMessageChecker)
+void MeshForwarder::RemoveMessages(Child &aChild, Message::SubType aSubType)
 {
     for (Message &message : mSendQueue)
     {
-        if (!aMessageChecker(message))
+        if ((aSubType != Message::kSubTypeNone) && (aSubType != message.GetSubType()))
         {
             continue;
         }
 
         if (mIndirectSender.RemoveMessageFromSleepyChild(message, aChild) != kErrorNone)
         {
-            const Neighbor *neighbor = nullptr;
-
-            if (message.GetType() == Message::kTypeIp6)
+            switch (message.GetType())
+            {
+            case Message::kTypeIp6:
             {
                 Ip6::Header ip6header;
 
                 IgnoreError(message.Read(0, ip6header));
-                neighbor = Get<NeighborTable>().FindNeighbor(ip6header.GetDestination());
+
+                if (&aChild == Get<NeighborTable>().FindNeighbor(ip6header.GetDestination()))
+                {
+                    message.ClearDirectTransmission();
+                }
+
+                break;
             }
-            else if (message.GetType() == Message::kType6lowpan)
+
+            case Message::kType6lowpan:
             {
                 Lowpan::MeshHeader meshHeader;
 
                 IgnoreError(meshHeader.ParseFrom(message));
-                neighbor = Get<NeighborTable>().FindNeighbor(meshHeader.GetDestination());
+
+                if (&aChild == Get<NeighborTable>().FindNeighbor(meshHeader.GetDestination()))
+                {
+                    message.ClearDirectTransmission();
+                }
+
+                break;
             }
 
-            if (&aChild == neighbor)
-            {
-                message.ClearDirectTransmission();
+            default:
+                break;
             }
         }
 
@@ -325,9 +337,14 @@ void MeshForwarder::RemoveDataResponseMessages(void)
             }
         }
 
+        if (mSendMessage == &message)
+        {
+            mSendMessage = nullptr;
+        }
+
         LogMessage(kMessageDrop, message);
         FinalizeMessageDirectTx(message, kErrorDrop);
-        RemoveMessageIfNoPendingTx(message);
+        mSendQueue.DequeueAndFree(message);
     }
 }
 
@@ -391,6 +408,102 @@ exit:
     return error;
 }
 
+void MeshForwarder::EvaluateRoutingCost(uint16_t aDest, uint8_t &aBestCost, uint16_t &aBestDest) const
+{
+    uint8_t cost = Get<RouterTable>().GetPathCost(aDest);
+
+    if ((aBestDest == Mle::kInvalidRloc16) || (cost < aBestCost))
+    {
+        aBestDest = aDest;
+        aBestCost = cost;
+    }
+}
+
+Error MeshForwarder::AnycastRouteLookup(uint8_t aServiceId, AnycastType aType, uint16_t &aMeshDest) const
+{
+    NetworkData::Iterator iterator = NetworkData::kIteratorInit;
+    uint8_t               bestCost = Mle::kMaxRouteCost;
+    uint16_t              bestDest = Mle::kInvalidRloc16;
+
+    switch (aType)
+    {
+    case kAnycastDhcp6Agent:
+    case kAnycastNeighborDiscoveryAgent:
+    {
+        NetworkData::OnMeshPrefixConfig config;
+        Lowpan::Context                 context;
+
+        SuccessOrExit(Get<NetworkData::Leader>().GetContext(aServiceId, context));
+
+        while (Get<NetworkData::Leader>().GetNextOnMeshPrefix(iterator, config) == kErrorNone)
+        {
+            if (config.GetPrefix() != context.mPrefix)
+            {
+                continue;
+            }
+
+            switch (aType)
+            {
+            case kAnycastDhcp6Agent:
+                if (!(config.mDhcp || config.mConfigure))
+                {
+                    continue;
+                }
+                break;
+            case kAnycastNeighborDiscoveryAgent:
+                if (!config.mNdDns)
+                {
+                    continue;
+                }
+                break;
+            default:
+                OT_ASSERT(false);
+                break;
+            }
+
+            EvaluateRoutingCost(config.mRloc16, bestCost, bestDest);
+        }
+
+        break;
+    }
+    case kAnycastService:
+    {
+        NetworkData::ServiceConfig config;
+
+        while (Get<NetworkData::Leader>().GetNextService(iterator, config) == kErrorNone)
+        {
+            if (config.mServiceId != aServiceId)
+            {
+                continue;
+            }
+
+            EvaluateRoutingCost(config.mServerConfig.mRloc16, bestCost, bestDest);
+        }
+
+        break;
+    }
+    }
+
+    if (Mle::IsChildRloc16(bestDest))
+    {
+        // If the selected destination is a child, we use its parent
+        // as the destination unless the device itself is the
+        // parent of the `bestDest`.
+
+        uint16_t bestDestParent = Mle::ParentRloc16ForRloc16(bestDest);
+
+        if (!Get<Mle::Mle>().HasRloc16(bestDestParent))
+        {
+            bestDest = bestDestParent;
+        }
+    }
+
+    aMeshDest = bestDest;
+
+exit:
+    return (bestDest != Mle::kInvalidRloc16) ? kErrorNone : kErrorNoRoute;
+}
+
 Error MeshForwarder::UpdateIp6RouteFtd(const Ip6::Header &aIp6Header, Message &aMessage)
 {
     Mle::MleRouter &mle   = Get<Mle::MleRouter>();
@@ -411,7 +524,42 @@ Error MeshForwarder::UpdateIp6RouteFtd(const Ip6::Header &aIp6Header, Message &a
     {
         uint16_t aloc16 = aIp6Header.GetDestination().GetIid().GetLocator();
 
-        SuccessOrExit(error = Get<NetworkData::Leader>().AnycastLookup(aloc16, mMeshDest));
+        if (aloc16 == Mle::kAloc16Leader)
+        {
+            mMeshDest = mle.GetLeaderRloc16();
+        }
+        else if (aloc16 <= Mle::kAloc16DhcpAgentEnd)
+        {
+            uint8_t contextId = static_cast<uint8_t>(aloc16 - Mle::kAloc16DhcpAgentStart + 1);
+            SuccessOrExit(error = AnycastRouteLookup(contextId, kAnycastDhcp6Agent, mMeshDest));
+        }
+        else if (aloc16 <= Mle::kAloc16ServiceEnd)
+        {
+            uint8_t serviceId = static_cast<uint8_t>(aloc16 - Mle::kAloc16ServiceStart);
+            SuccessOrExit(error = AnycastRouteLookup(serviceId, kAnycastService, mMeshDest));
+        }
+        else if (aloc16 <= Mle::kAloc16CommissionerEnd)
+        {
+            SuccessOrExit(error = Get<NetworkData::Leader>().FindBorderAgentRloc(mMeshDest));
+        }
+
+#if (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2)
+        else if (aloc16 == Mle::kAloc16BackboneRouterPrimary)
+        {
+            VerifyOrExit(Get<BackboneRouter::Leader>().HasPrimary(), error = kErrorDrop);
+            mMeshDest = Get<BackboneRouter::Leader>().GetServer16();
+        }
+#endif
+        else if ((aloc16 >= Mle::kAloc16NeighborDiscoveryAgentStart) &&
+                 (aloc16 <= Mle::kAloc16NeighborDiscoveryAgentEnd))
+        {
+            uint8_t contextId = static_cast<uint8_t>(aloc16 - Mle::kAloc16NeighborDiscoveryAgentStart + 1);
+            SuccessOrExit(error = AnycastRouteLookup(contextId, kAnycastNeighborDiscoveryAgent, mMeshDest));
+        }
+        else
+        {
+            ExitNow(error = kErrorDrop);
+        }
 
         // If the selected ALOC destination, `mMeshDest`, is a sleepy
         // child of this device, prepare the message for indirect tx

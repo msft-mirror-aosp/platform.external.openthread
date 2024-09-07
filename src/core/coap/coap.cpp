@@ -35,7 +35,6 @@
 #include "common/locator_getters.hpp"
 #include "common/log.hpp"
 #include "common/random.hpp"
-#include "common/string.hpp"
 #include "instance/instance.hpp"
 #include "net/ip6.hpp"
 #include "net/udp6.hpp"
@@ -161,13 +160,13 @@ exit:
     return aMessage;
 }
 
-Message *CoapBase::InitResponse(Message *aMessage, const Message &aRequest)
+Message *CoapBase::InitResponse(Message *aMessage, const Message &aResponse)
 {
     Error error = kErrorNone;
 
     VerifyOrExit(aMessage != nullptr);
 
-    SuccessOrExit(error = aMessage->SetDefaultResponseHeader(aRequest));
+    SuccessOrExit(error = aMessage->SetDefaultResponseHeader(aResponse));
     SuccessOrExit(error = aMessage->SetPayloadMarker());
 
 exit:
@@ -1361,7 +1360,7 @@ void CoapBase::ProcessReceivedRequest(Message &aMessage, const Ip6::MessageInfo 
 
     for (const ResourceBlockWise &resource : mBlockWiseResources)
     {
-        if (!StringMatch(resource.GetUriPath(), uriPath))
+        if (strcmp(resource.GetUriPath(), uriPath) != 0)
         {
             continue;
         }
@@ -1428,7 +1427,7 @@ void CoapBase::ProcessReceivedRequest(Message &aMessage, const Ip6::MessageInfo 
 
     for (const Resource &resource : mResources)
     {
-        if (StringMatch(resource.mUriPath, uriPath))
+        if (strcmp(resource.mUriPath, uriPath) == 0)
         {
             resource.HandleRequest(aMessage, aMessageInfo);
             error = kErrorNone;

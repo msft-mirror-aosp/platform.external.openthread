@@ -394,15 +394,13 @@ void SubMac::StartCsmaBackoff(void)
 
         if (ShouldHandleTransmitTargetTime())
         {
-            static constexpr uint32_t kAheadTime = kCcaSampleInterval + kCslTransmitTimeAhead + kRadioHeaderShrDuration;
-            Time                      txStartTime = Time(mTransmitFrame.mInfo.mTxInfo.mTxDelayBaseTime);
-            Time                      radioNow    = Time(static_cast<uint32_t>(otPlatRadioGetNow(&GetInstance())));
-
-            txStartTime += (mTransmitFrame.mInfo.mTxInfo.mTxDelay - kAheadTime);
-
-            if (radioNow < txStartTime)
+            if (Time(static_cast<uint32_t>(otPlatRadioGetNow(&GetInstance()))) <
+                Time(mTransmitFrame.mInfo.mTxInfo.mTxDelayBaseTime) + mTransmitFrame.mInfo.mTxInfo.mTxDelay -
+                    kCcaSampleInterval - kCslTransmitTimeAhead - kRadioHeaderShrDuration)
             {
-                StartTimer(txStartTime - radioNow);
+                mTimer.StartAt(Time(mTransmitFrame.mInfo.mTxInfo.mTxDelayBaseTime) - kCcaSampleInterval -
+                                   kCslTransmitTimeAhead - kRadioHeaderShrDuration,
+                               mTransmitFrame.mInfo.mTxInfo.mTxDelay);
             }
             else // Transmit without delay
             {
@@ -446,7 +444,11 @@ void SubMac::StartTimerForBackoff(uint8_t aBackoffExponent)
         IgnoreError(Get<Radio>().Sleep());
     }
 
-    StartTimer(backoff);
+#if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
+    mTimer.Start(backoff);
+#else
+    mTimer.Start(backoff / 1000UL);
+#endif
 
 #if OPENTHREAD_CONFIG_MAC_ADD_DELAY_ON_NO_ACK_ERROR_BEFORE_RETRY
     if (mState == kStateDelayBeforeRetx)
@@ -499,7 +501,11 @@ void SubMac::HandleTransmitStarted(TxFrame &aFrame)
 {
     if (ShouldHandleAckTimeout() && aFrame.GetAckRequest())
     {
-        StartTimer(kAckTimeout);
+#if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
+        mTimer.Start(kAckTimeout * 1000UL);
+#else
+        mTimer.Start(kAckTimeout);
+#endif
     }
 }
 
@@ -700,7 +706,7 @@ Error SubMac::EnergyScan(uint8_t aScanChannel, uint16_t aScanDuration)
         SetState(kStateEnergyScan);
         mEnergyScanMaxRssi = Radio::kInvalidRssi;
         mEnergyScanEndTime = TimerMilli::GetNow() + static_cast<uint32_t>(aScanDuration);
-        StartTimer(0);
+        mTimer.Start(0);
     }
     else
     {
@@ -727,7 +733,11 @@ void SubMac::SampleRssi(void)
 
     if (TimerMilli::GetNow() < mEnergyScanEndTime)
     {
-        StartTimerAt(mTimer.GetFireTime(), kEnergyScanRssiSampleInterval);
+#if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
+        mTimer.StartAt(mTimer.GetFireTime(), kEnergyScanRssiSampleInterval * 1000UL);
+#else
+        mTimer.StartAt(mTimer.GetFireTime(), kEnergyScanRssiSampleInterval);
+#endif
     }
     else
     {
@@ -966,24 +976,6 @@ void SubMac::SetFrameCounter(uint32_t aFrameCounter, bool aSetIfLarger)
 
 exit:
     return;
-}
-
-void SubMac::StartTimer(uint32_t aDelayUs)
-{
-#if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
-    mTimer.Start(aDelayUs);
-#else
-    mTimer.Start(aDelayUs / Time::kOneMsecInUsec);
-#endif
-}
-
-void SubMac::StartTimerAt(Time aStartTime, uint32_t aDelayUs)
-{
-#if OPENTHREAD_CONFIG_PLATFORM_USEC_TIMER_ENABLE
-    mTimer.StartAt(aStartTime, aDelayUs);
-#else
-    mTimer.StartAt(aStartTime, aDelayUs / Time::kOneMsecInUsec);
-#endif
 }
 
 // LCOV_EXCL_START

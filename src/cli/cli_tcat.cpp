@@ -32,7 +32,6 @@
 
 #include "cli/cli_tcat.hpp"
 #include "common/code_utils.hpp"
-#include "common/error.hpp"
 
 #include <openthread/ble_secure.h>
 
@@ -89,25 +88,10 @@ namespace ot {
 
 namespace Cli {
 
-otTcatAdvertisedDeviceId sAdvertisedDeviceIds[OT_TCAT_DEVICE_ID_MAX];
-otTcatGeneralDeviceId    sGeneralDeviceId;
+otTcatDeviceId sVendorDeviceIds[OT_TCAT_DEVICE_ID_MAX];
 
 const char kPskdVendor[] = "JJJJJJ";
 const char kUrl[]        = "dummy_url";
-
-static bool IsDeviceIdSet(void)
-{
-    bool ret = false;
-    for (const otTcatAdvertisedDeviceId &vendorDeviceId : sAdvertisedDeviceIds)
-    {
-        if (vendorDeviceId.mDeviceIdType != OT_TCAT_DEVICE_ID_EMPTY)
-        {
-            ExitNow(ret = true);
-        }
-    }
-exit:
-    return ret;
-}
 
 static void HandleBleSecureReceive(otInstance               *aInstance,
                                    const otMessage          *aMessage,
@@ -137,25 +121,29 @@ static void HandleBleSecureReceive(otInstance               *aInstance,
     IgnoreReturnValue(otBleSecureFlush(aInstance));
 }
 
-template <> otError Tcat::Process<Cmd("advid")>(Arg aArgs[])
+template <> otError Tcat::Process<Cmd("vendorid")>(Arg aArgs[])
 {
     otError                  error = OT_ERROR_NONE;
-    otTcatAdvertisedDeviceId devId;
-    static const char *const kVendorIdTypes[] = {"clear", "oui24", "oui36", "discriminator", "ianapen"};
+    otTcatDeviceId           devId;
+    static const char *const kVendorIdTypes[] = {"empty", "oui24", "oui36", "discriminator", "ianapen"};
 
-    mVendorInfo.mAdvertisedDeviceIds = sAdvertisedDeviceIds;
+    mVendorInfo.mDeviceIds = sVendorDeviceIds;
 
     if (aArgs[0].IsEmpty())
     {
-        if (mVendorInfo.mAdvertisedDeviceIds[0].mDeviceIdType != OT_TCAT_DEVICE_ID_EMPTY)
+        if (mVendorInfo.mDeviceIds[0].mDeviceIdType != OT_TCAT_DEVICE_ID_EMPTY)
         {
-            OutputLine("Set advertisedIds:");
-            for (size_t i = 0; mVendorInfo.mAdvertisedDeviceIds[i].mDeviceIdType != OT_TCAT_DEVICE_ID_EMPTY; i++)
+            OutputLine("Set vendorIds:");
+            for (size_t i = 0; mVendorInfo.mDeviceIds[i].mDeviceIdType != OT_TCAT_DEVICE_ID_EMPTY; i++)
             {
-                OutputFormat("type %s, value: ", kVendorIdTypes[mVendorInfo.mAdvertisedDeviceIds[i].mDeviceIdType]);
-                OutputBytesLine(const_cast<uint8_t *>(mVendorInfo.mAdvertisedDeviceIds[i].mDeviceId),
-                                mVendorInfo.mAdvertisedDeviceIds[i].mDeviceIdLen);
+                OutputFormat("type %s, value: ", kVendorIdTypes[mVendorInfo.mDeviceIds[i].mDeviceIdType]);
+                OutputBytesLine(const_cast<uint8_t *>(mVendorInfo.mDeviceIds[i].mDeviceId),
+                                mVendorInfo.mDeviceIds[i].mDeviceIdLen);
             }
+        }
+        else
+        {
+            OutputLine("%s", kVendorIdTypes[OT_TCAT_DEVICE_ID_EMPTY]);
         }
         ExitNow();
     }
@@ -178,7 +166,7 @@ template <> otError Tcat::Process<Cmd("advid")>(Arg aArgs[])
     }
     else if (aArgs[0] == kVendorIdTypes[OT_TCAT_DEVICE_ID_EMPTY])
     {
-        for (otTcatAdvertisedDeviceId &vendorDeviceId : sAdvertisedDeviceIds)
+        for (otTcatDeviceId &vendorDeviceId : sVendorDeviceIds)
         {
             vendorDeviceId.mDeviceIdType = OT_TCAT_DEVICE_ID_EMPTY;
             vendorDeviceId.mDeviceIdLen  = 0;
@@ -190,11 +178,11 @@ template <> otError Tcat::Process<Cmd("advid")>(Arg aArgs[])
         ExitNow(error = OT_ERROR_INVALID_ARGS);
     }
 
-    if (!aArgs[1].IsEmpty() && aArgs[1].GetLength() < (OT_TCAT_MAX_ADVERTISED_DEVICEID_SIZE * 2 + 1))
+    if (!aArgs[1].IsEmpty() && aArgs[1].GetLength() < (OT_TCAT_MAX_VENDORID_SIZE * 2 + 1))
     {
-        devId.mDeviceIdLen = OT_TCAT_MAX_ADVERTISED_DEVICEID_SIZE;
+        devId.mDeviceIdLen = OT_TCAT_MAX_VENDORID_SIZE;
         SuccessOrExit(error = aArgs[1].ParseAsHexString(devId.mDeviceIdLen, devId.mDeviceId));
-        for (otTcatAdvertisedDeviceId &vendorDeviceId : sAdvertisedDeviceIds)
+        for (otTcatDeviceId &vendorDeviceId : sVendorDeviceIds)
         {
             if (vendorDeviceId.mDeviceIdType == devId.mDeviceIdType ||
                 vendorDeviceId.mDeviceIdType == OT_TCAT_DEVICE_ID_EMPTY)
@@ -212,35 +200,6 @@ exit:
     return error;
 }
 
-template <> otError Tcat::Process<Cmd("devid")>(Arg aArgs[])
-{
-    otError error = OT_ERROR_NONE;
-
-    if (aArgs[0].IsEmpty())
-    {
-        if (sGeneralDeviceId.mDeviceIdLen != 0)
-        {
-            OutputLine("TCAT DeviceId:");
-            OutputBytesLine(sGeneralDeviceId.mDeviceId, sGeneralDeviceId.mDeviceIdLen);
-        }
-        ExitNow();
-    }
-
-    if (aArgs[0] == "clear")
-    {
-        ClearAllBytes(sGeneralDeviceId);
-    }
-    else
-    {
-        VerifyOrExit(aArgs[0].GetLength() < (OT_TCAT_MAX_DEVICEID_SIZE * 2 + 1), error = OT_ERROR_INVALID_ARGS);
-        sGeneralDeviceId.mDeviceIdLen = OT_TCAT_MAX_DEVICEID_SIZE;
-        SuccessOrExit(error = aArgs[0].ParseAsHexString(sGeneralDeviceId.mDeviceIdLen, sGeneralDeviceId.mDeviceId));
-    }
-
-exit:
-    return error;
-}
-
 template <> otError Tcat::Process<Cmd("start")>(Arg aArgs[])
 {
     OT_UNUSED_VARIABLE(aArgs);
@@ -250,16 +209,6 @@ template <> otError Tcat::Process<Cmd("start")>(Arg aArgs[])
     ClearAllBytes(mVendorInfo);
     mVendorInfo.mPskdString      = kPskdVendor;
     mVendorInfo.mProvisioningUrl = kUrl;
-
-    if (IsDeviceIdSet())
-    {
-        mVendorInfo.mAdvertisedDeviceIds = sAdvertisedDeviceIds;
-    }
-
-    if (sGeneralDeviceId.mDeviceIdLen != 0)
-    {
-        mVendorInfo.mGeneralDeviceId = &sGeneralDeviceId;
-    }
 
     otBleSecureSetCertificate(GetInstancePtr(), reinterpret_cast<const uint8_t *>(OT_CLI_TCAT_X509_CERT),
                               sizeof(OT_CLI_TCAT_X509_CERT), reinterpret_cast<const uint8_t *>(OT_CLI_TCAT_PRIV_KEY),
@@ -295,11 +244,9 @@ otError Tcat::Process(Arg aArgs[])
         aCommandString, &Tcat::Process<Cmd(aCommandString)> \
     }
 
-    static constexpr Command kCommands[] = {CmdEntry("advid"), CmdEntry("devid"), CmdEntry("start"), CmdEntry("stop")};
+    static constexpr Command kCommands[] = {CmdEntry("start"), CmdEntry("stop"), CmdEntry("vendorid")};
 
     static_assert(BinarySearch::IsSorted(kCommands), "kCommands is not sorted");
-
-#undef CmdEntry
 
     otError        error = OT_ERROR_NONE;
     const Command *command;

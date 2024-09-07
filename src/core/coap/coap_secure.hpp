@@ -53,10 +53,13 @@ class CoapSecure : public CoapBase
 {
 public:
     /**
-     * Function pointer which is called reporting a connection event (when connection established or disconnected)
+     * Pointer is called once DTLS connection is established.
+     *
+     * @param[in]  aConnected  TRUE if a connection was established, FALSE otherwise.
+     * @param[in]  aContext    A pointer to arbitrary context information.
      *
      */
-    typedef otHandleCoapSecureClientConnect ConnectEventCallback;
+    typedef void (*ConnectedCallback)(bool aConnected, void *aContext);
 
     /**
      * Callback to notify when the agent is automatically stopped due to reaching the maximum number of connection
@@ -119,9 +122,9 @@ public:
      * @param[in]  aContext   A pointer to arbitrary context information.
      *
      */
-    void SetConnectEventCallback(ConnectEventCallback aCallback, void *aContext)
+    void SetConnectedCallback(ConnectedCallback aCallback, void *aContext)
     {
-        mConnectEventCallback.Set(aCallback, aContext);
+        mConnectedCallback.Set(aCallback, aContext);
     }
 
     /**
@@ -140,7 +143,7 @@ public:
      * @retval kErrorNone  Successfully started DTLS connection.
      *
      */
-    Error Connect(const Ip6::SockAddr &aSockAddr, ConnectEventCallback aCallback, void *aContext);
+    Error Connect(const Ip6::SockAddr &aSockAddr, ConnectedCallback aCallback, void *aContext);
 
     /**
      * Indicates whether or not the DTLS session is active.
@@ -418,8 +421,8 @@ private:
     }
     Error Send(ot::Message &aMessage, const Ip6::MessageInfo &aMessageInfo);
 
-    static void HandleDtlsConnectEvent(MeshCoP::SecureTransport::ConnectEvent aEvent, void *aContext);
-    void        HandleDtlsConnectEvent(MeshCoP::SecureTransport::ConnectEvent aEvent);
+    static void HandleDtlsConnected(void *aContext, bool aConnected);
+    void        HandleDtlsConnected(bool aConnected);
 
     static void HandleDtlsAutoClose(void *aContext);
     void        HandleDtlsAutoClose(void);
@@ -430,11 +433,11 @@ private:
     static void HandleTransmit(Tasklet &aTasklet);
     void        HandleTransmit(void);
 
-    MeshCoP::SecureTransport       mDtls;
-    Callback<ConnectEventCallback> mConnectEventCallback;
-    Callback<AutoStopCallback>     mAutoStopCallback;
-    ot::MessageQueue               mTransmitQueue;
-    TaskletContext                 mTransmitTask;
+    MeshCoP::SecureTransport    mDtls;
+    Callback<ConnectedCallback> mConnectedCallback;
+    Callback<AutoStopCallback>  mAutoStopCallback;
+    ot::MessageQueue            mTransmitQueue;
+    TaskletContext              mTransmitTask;
 };
 
 } // namespace Coap

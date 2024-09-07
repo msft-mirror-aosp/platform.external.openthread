@@ -91,7 +91,7 @@ class TxParameters : public otCoapTxParameters
 
 public:
     /**
-     * Converts a pointer to `otCoapTxParameters` to `Coap::TxParamters`
+     * Coverts a pointer to `otCoapTxParameters` to `Coap::TxParamters`
      *
      * If the pointer is `nullptr`, the default parameters are used instead.
      *
@@ -887,7 +887,7 @@ private:
     };
 
     Message *InitMessage(Message *aMessage, Type aType, Uri aUri);
-    Message *InitResponse(Message *aMessage, const Message &aRequest);
+    Message *InitResponse(Message *aMessage, const Message &aResponse);
 
     static void HandleRetransmissionTimer(Timer &aTimer);
     void        HandleRetransmissionTimer(void);

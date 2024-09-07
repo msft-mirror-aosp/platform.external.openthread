@@ -202,7 +202,7 @@ otError otThreadBecomeRouter(otInstance *aInstance)
 
 otError otThreadBecomeLeader(otInstance *aInstance)
 {
-    return AsCoreType(aInstance).Get<Mle::MleRouter>().BecomeLeader(/* aCheckWeight */ true);
+    return AsCoreType(aInstance).Get<Mle::MleRouter>().BecomeLeader();
 }
 
 uint8_t otThreadGetRouterDowngradeThreshold(otInstance *aInstance)

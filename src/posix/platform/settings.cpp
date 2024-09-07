@@ -232,7 +232,6 @@ void otPlatSettingsDeinit(otInstance *aInstance)
 
     VerifyOrExit(sSettingsFd != -1);
     VerifyOrDie(close(sSettingsFd) == 0, OT_EXIT_ERROR_ERRNO);
-    sSettingsFd = -1;
 
 exit:
     return;

@@ -183,8 +183,6 @@ Array<DeprecatingPrefix, kMaxDeprecatingPrefixes> sDeprecatingPrefixes;
 
 static constexpr uint16_t kMaxRioPrefixes = 10;
 
-using NetworkData::RoutePreference;
-
 struct RioPrefix
 {
     RioPrefix(void) = default;
@@ -193,14 +191,12 @@ struct RioPrefix
         : mSawInRa(false)
         , mPrefix(aPrefix)
         , mLifetime(0)
-        , mPreference(NetworkData::kRoutePreferenceMedium)
     {
     }
 
-    bool            mSawInRa;    // Indicate whether or not this prefix was seen in the emitted RA (as RIO).
-    Ip6::Prefix     mPrefix;     // The RIO prefix.
-    uint32_t        mLifetime;   // The RIO prefix lifetime - only valid when `mSawInRa`
-    RoutePreference mPreference; // The RIO preference - only valid when `mSawInRa`
+    bool        mSawInRa;  // Indicate whether or not this prefix was seen in the emitted RA (as RIO).
+    Ip6::Prefix mPrefix;   // The RIO prefix.
+    uint32_t    mLifetime; // The RIO prefix lifetime - only valid when `mSawInRa`
 };
 
 class ExpectedRios : public Array<RioPrefix, kMaxRioPrefixes>
@@ -535,9 +531,8 @@ void ValidateRouterAdvert(const Icmp6Packet &aPacket)
             {
                 if (prefix == rioPrefix.mPrefix)
                 {
-                    rioPrefix.mSawInRa    = true;
-                    rioPrefix.mLifetime   = rio.GetRouteLifetime();
-                    rioPrefix.mPreference = rio.GetPreference();
+                    rioPrefix.mSawInRa  = true;
+                    rioPrefix.mLifetime = rio.GetRouteLifetime();
                 }
             }
 
@@ -745,6 +740,8 @@ void VerifyNoOmrPrefixInNetData(void)
     Log("VerifyNoOmrPrefixInNetData()");
     VerifyOrQuit(otNetDataGetNextOnMeshPrefix(sInstance, &iterator, &prefixConfig) != kErrorNone);
 }
+
+using NetworkData::RoutePreference;
 
 enum ExternalRouteMode : uint8_t
 {
@@ -1422,7 +1419,6 @@ void TestOmrSelection(void)
     VerifyOrQuit(sRaValidated);
     VerifyOrQuit(sExpectedRios.SawAll());
     VerifyOrQuit(sExpectedRios[0].mLifetime == kRioValidLifetime);
-    VerifyOrQuit(sExpectedRios[0].mPreference == NetworkData::kRoutePreferenceMedium);
 
     Log("Received RA was validated");
 
@@ -1464,9 +1460,7 @@ void TestOmrSelection(void)
     VerifyOrQuit(sRaValidated);
     VerifyOrQuit(sExpectedRios.SawAll());
     VerifyOrQuit(sExpectedRios[0].mLifetime == kRioValidLifetime);
-    VerifyOrQuit(sExpectedRios[0].mPreference == NetworkData::kRoutePreferenceMedium);
     VerifyOrQuit(sExpectedRios[1].mLifetime <= kRioDeprecatingLifetime);
-    VerifyOrQuit(sExpectedRios[1].mPreference == NetworkData::kRoutePreferenceLow);
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Check Network Data. We should now see that the local OMR prefix
@@ -1497,9 +1491,7 @@ void TestOmrSelection(void)
     VerifyOrQuit(sRaValidated);
     VerifyOrQuit(sExpectedRios.SawAll());
     VerifyOrQuit(sExpectedRios[0].mLifetime <= kRioDeprecatingLifetime);
-    VerifyOrQuit(sExpectedRios[0].mPreference == NetworkData::kRoutePreferenceLow);
     VerifyOrQuit(sExpectedRios[1].mLifetime == kRioValidLifetime);
-    VerifyOrQuit(sExpectedRios[1].mPreference == NetworkData::kRoutePreferenceMedium);
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Check Network Data. We should see that the local OMR prefix is
@@ -1522,7 +1514,6 @@ void TestOmrSelection(void)
     VerifyOrQuit(sExpectedRios.SawAll());
     VerifyOrQuit(sExpectedRios[0].mLifetime == 0);
     VerifyOrQuit(sExpectedRios[1].mLifetime == kRioValidLifetime);
-    VerifyOrQuit(sExpectedRios[0].mPreference == NetworkData::kRoutePreferenceLow);
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2211,7 +2202,6 @@ void TestDomainPrefixAsOmr(void)
     VerifyOrQuit(sExpectedRios[1].mPrefix == localOmr);
     VerifyOrQuit(sExpectedRios[1].mSawInRa);
     VerifyOrQuit(sExpectedRios[1].mLifetime <= kRioDeprecatingLifetime);
-    VerifyOrQuit(sExpectedRios[1].mPreference == NetworkData::kRoutePreferenceLow);
 
     // Wait long enough for deprecating RIO prefix to expire
     AdvanceTime(3200000);

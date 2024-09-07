@@ -75,7 +75,8 @@ Error Leader::GetServiceId(uint8_t &aServiceId) const
     Error error = kErrorNone;
 
     VerifyOrExit(HasPrimary(), error = kErrorNotFound);
-    error = Get<NetworkData::Service::Manager>().GetBackboneRouterServiceId(aServiceId);
+    error = Get<NetworkData::Service::Manager>().GetServiceId<NetworkData::Service::BackboneRouter>(
+        /* aServerStable */ true, aServiceId);
 
 exit:
     return error;

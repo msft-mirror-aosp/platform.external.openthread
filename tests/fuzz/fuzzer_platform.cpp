@@ -77,21 +77,9 @@ bool otMacFrameIsAckRequested(const otRadioFrame *aFrame)
     return static_cast<const Mac::Frame *>(aFrame)->GetAckRequest();
 }
 
-otError otMacFrameGetSequence(const otRadioFrame *aFrame, uint8_t *aSequence)
+uint8_t otMacFrameGetSequence(const otRadioFrame *aFrame)
 {
-    otError error;
-
-    if (static_cast<const Mac::Frame *>(aFrame)->IsSequencePresent())
-    {
-        *aSequence = static_cast<const Mac::Frame *>(aFrame)->GetSequence();
-        error      = kErrorNone;
-    }
-    else
-    {
-        error = kErrorParse;
-    }
-
-    return error;
+    return static_cast<const Mac::Frame *>(aFrame)->GetSequence();
 }
 
 void FuzzerPlatformInit(void)
@@ -113,13 +101,10 @@ void FuzzerPlatformProcess(otInstance *aInstance)
 
         if (otMacFrameIsAckRequested(&sRadioTransmitFrame))
         {
-            otError error;
-
             sRadioAckFrame.mLength  = IEEE802154_ACK_LENGTH;
             sRadioAckFrame.mPsdu[0] = IEEE802154_FRAME_TYPE_ACK;
             sRadioAckFrame.mPsdu[1] = 0;
-            error                   = otMacFrameGetSequence(&sRadioTransmitFrame, &sRadioAckFrame.mPsdu[2]);
-            OT_ASSERT(error == OT_ERROR_NONE);
+            sRadioAckFrame.mPsdu[2] = otMacFrameGetSequence(&sRadioTransmitFrame);
             sRadioAckFrame.mChannel = sRadioTransmitFrame.mChannel;
 
             otPlatRadioTxDone(aInstance, &sRadioTransmitFrame, &sRadioAckFrame, OT_ERROR_NONE);

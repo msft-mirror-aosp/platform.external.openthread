@@ -127,20 +127,19 @@ exit:
     return;
 }
 
-void Commissioner::HandleSecureAgentConnectEvent(SecureTransport::ConnectEvent aEvent, void *aContext)
+void Commissioner::HandleSecureAgentConnected(bool aConnected, void *aContext)
 {
-    static_cast<Commissioner *>(aContext)->HandleSecureAgentConnectEvent(aEvent);
+    static_cast<Commissioner *>(aContext)->HandleSecureAgentConnected(aConnected);
 }
 
-void Commissioner::HandleSecureAgentConnectEvent(SecureTransport::ConnectEvent aEvent)
+void Commissioner::HandleSecureAgentConnected(bool aConnected)
 {
-    bool isConnected = (aEvent == SecureTransport::kConnected);
-    if (!isConnected)
+    if (!aConnected)
     {
         mJoinerSessionTimer.Stop();
     }
 
-    SignalJoinerEvent(isConnected ? kJoinerEventConnected : kJoinerEventEnd, mActiveJoiner);
+    SignalJoinerEvent(aConnected ? kJoinerEventConnected : kJoinerEventEnd, mActiveJoiner);
 }
 
 Commissioner::Joiner *Commissioner::GetUnusedJoinerEntry(void)
@@ -288,7 +287,7 @@ Error Commissioner::Start(StateCallback aStateCallback, JoinerCallback aJoinerCa
 #endif
 
     SuccessOrExit(error = Get<Tmf::SecureAgent>().Start(SendRelayTransmit, this));
-    Get<Tmf::SecureAgent>().SetConnectEventCallback(&Commissioner::HandleSecureAgentConnectEvent, this);
+    Get<Tmf::SecureAgent>().SetConnectedCallback(&Commissioner::HandleSecureAgentConnected, this);
 
     mStateCallback.Set(aStateCallback, aCallbackContext);
     mJoinerCallback.Set(aJoinerCallback, aCallbackContext);

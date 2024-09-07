@@ -334,7 +334,7 @@ otError otBleSecureConnect(otInstance *aInstance);
 void otBleSecureDisconnect(otInstance *aInstance);
 
 /**
- * Indicates whether or not the TLS session is active (connected or connecting).
+ * Indicates whether or not the TLS session is active (connected or conneting).
  *
  * @param[in]  aInstance  A pointer to an OpenThread instance.
  *

@@ -205,7 +205,6 @@ void TestMacHeader(void)
         Mac::Frame::KeyIdMode     mKeyIdMode;
         uint8_t                   mHeaderLength;
         uint8_t                   mFooterLength;
-        bool                      mSuppressSequence;
     };
 
     static constexpr Mac::Frame::Version kVer2006 = Mac::Frame::kVersion2006;
@@ -266,7 +265,6 @@ void TestMacHeader(void)
         {kVer2015, kExtdAddr, kNoPanId, kNoneAddr, kNoPanId, kMic32, kModeId1, 17, 6},
         {kVer2015, kExtdAddr, kNoPanId, kExtdAddr, kNoPanId, kNoSec, kModeId1, 19, 2},
         {kVer2015, kExtdAddr, kNoPanId, kExtdAddr, kNoPanId, kMic32, kModeId1, 25, 6},
-        {kVer2015, kExtdAddr, kNoPanId, kExtdAddr, kNoPanId, kMic32, kModeId1, 24, 6, true},
     };
 
     const uint16_t kPanId1     = 0xbaba;
@@ -287,9 +285,7 @@ void TestMacHeader(void)
 
     for (const TestCase &testCase : kTestCases)
     {
-        uint8_t psdu[OT_RADIO_FRAME_MAX_SIZE];
-        uint8_t offset;
-
+        uint8_t        psdu[OT_RADIO_FRAME_MAX_SIZE];
         Mac::TxFrame   frame;
         Mac::Addresses addresses;
         Mac::Address   address;
@@ -356,7 +352,7 @@ void TestMacHeader(void)
         }
 
         frame.InitMacHeader(Mac::Frame::kTypeData, testCase.mVersion, addresses, panIds, testCase.mSecurity,
-                            testCase.mKeyIdMode, testCase.mSuppressSequence);
+                            testCase.mKeyIdMode);
 
         VerifyOrQuit(frame.GetHeaderLength() == testCase.mHeaderLength);
         VerifyOrQuit(frame.GetFooterLength() == testCase.mFooterLength);
@@ -405,20 +401,11 @@ void TestMacHeader(void)
             VerifyOrQuit(keyIdMode == testCase.mKeyIdMode);
         }
 
-        offset = snprintf(string, sizeof(string), "\nver:%s, src[addr:%s, pan:%s], dst[addr:%s, pan:%s], sec:%s",
-                          (testCase.mVersion == kVer2006) ? "2006" : "2015", kAddrTypeStrings[testCase.mSrcAddrType],
-                          kPanIdModeStrings[testCase.mSrcPanIdMode], kAddrTypeStrings[testCase.mDstAddrType],
-                          kPanIdModeStrings[testCase.mDstPanIdMode], testCase.mSecurity == kNoSec ? "no" : "mic32");
+        snprintf(string, sizeof(string), "\nver:%s, src[addr:%s, pan:%s], dst[addr:%s, pan:%s], sec:%s",
+                 (testCase.mVersion == kVer2006) ? "2006" : "2015", kAddrTypeStrings[testCase.mSrcAddrType],
+                 kPanIdModeStrings[testCase.mSrcPanIdMode], kAddrTypeStrings[testCase.mDstAddrType],
+                 kPanIdModeStrings[testCase.mDstPanIdMode], testCase.mSecurity == kNoSec ? "no" : "mic32");
 
-        if (!testCase.mSuppressSequence)
-        {
-            VerifyOrQuit(frame.IsSequencePresent());
-            offset += snprintf(string + offset, sizeof(string) - offset, ", seq:%u", frame.GetSequence());
-        }
-        else
-        {
-            VerifyOrQuit(!frame.IsSequencePresent());
-        }
         DumpBuffer(string, frame.GetPsdu(), frame.GetLength());
     }
 }
@@ -603,7 +590,6 @@ void TestMacFrameApi(void)
     VerifyOrQuit(!frame.IsDstAddrPresent());
     VerifyOrQuit(frame.GetVersion() == Mac::Frame::kVersion2006);
     VerifyOrQuit(!frame.IsSrcAddrPresent());
-    VerifyOrQuit(frame.IsSequencePresent());
     VerifyOrQuit(frame.GetSequence() == 94);
 
 #if (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2)
@@ -633,7 +619,6 @@ void TestMacFrameApi(void)
     uint8_t commandId;
     frame.mPsdu   = mac_cmd_psdu1;
     frame.mLength = sizeof(mac_cmd_psdu1);
-    VerifyOrQuit(frame.IsSequencePresent());
     VerifyOrQuit(frame.GetSequence() == 133);
     VerifyOrQuit(frame.GetVersion() == Mac::Frame::kVersion2006);
     VerifyOrQuit(frame.GetType() == Mac::Frame::kTypeMacCmd);
@@ -652,7 +637,6 @@ void TestMacFrameApi(void)
     //   Command Identifier: Data Request (0x04)
     frame.mPsdu   = mac_cmd_psdu2;
     frame.mLength = sizeof(mac_cmd_psdu2);
-    VerifyOrQuit(frame.IsSequencePresent());
     VerifyOrQuit(frame.GetSequence() == 141);
     VerifyOrQuit(frame.IsVersion2015());
     VerifyOrQuit(frame.GetType() == Mac::Frame::kTypeMacCmd);
@@ -716,7 +700,6 @@ void TestMacFrameAckGeneration(void)
     VerifyOrQuit(!ackFrame.IsDstAddrPresent());
     VerifyOrQuit(!ackFrame.IsSrcAddrPresent());
     VerifyOrQuit(ackFrame.GetVersion() == Mac::Frame::kVersion2006);
-    VerifyOrQuit(ackFrame.IsSequencePresent());
     VerifyOrQuit(ackFrame.GetSequence() == 189);
 
 #if (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2)
@@ -775,7 +758,6 @@ void TestMacFrameAckGeneration(void)
     VerifyOrQuit(ackFrame.IsDstAddrPresent());
     VerifyOrQuit(!ackFrame.IsSrcAddrPresent());
     VerifyOrQuit(ackFrame.GetVersion() == Mac::Frame::kVersion2015);
-    VerifyOrQuit(ackFrame.IsSequencePresent());
     VerifyOrQuit(ackFrame.GetSequence() == 142);
     VerifyOrQuit(csl->GetPeriod() == 3125 && csl->GetPhase() == 3105);
 

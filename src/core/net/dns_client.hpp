@@ -770,8 +770,7 @@ public:
 #endif // OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE
 
 private:
-    static constexpr uint16_t kMaxCnameAliasNameChanges     = 40;
-    static constexpr uint8_t  kLimitedQueryServersArraySize = 3;
+    static constexpr uint16_t kMaxCnameAliasNameChanges = 40;
 
     enum QueryType : uint8_t
     {
@@ -859,9 +858,6 @@ private:
                   void              *aContext,
                   const QueryConfig *aConfig,
                   bool               aShouldResolveHostAddr);
-    void  CheckAndUpdateServiceMode(QueryConfig &aConfig, const QueryConfig *aRequestConfig) const;
-    void  RecordServerAsLimitedToSingleQuestion(const Ip6::Address &aServerAddress);
-    void  RecordServerAsCapableOfMultiQuestions(const Ip6::Address &aServerAddress);
     Error ReplaceWithSeparateSrvTxtQueries(Query &aQuery);
     void  ResolveHostAddressIfNeeded(Query &aQuery, const Message &aResponseMessage);
 #endif
@@ -929,7 +925,6 @@ private:
 #if OPENTHREAD_CONFIG_DNS_CLIENT_DEFAULT_SERVER_ADDRESS_AUTO_SET_ENABLE
     bool mUserDidSetDefaultAddress;
 #endif
-    Array<Ip6::Address, kLimitedQueryServersArraySize> mLimitedQueryServers;
 };
 
 } // namespace Dns

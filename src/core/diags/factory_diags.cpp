@@ -33,7 +33,6 @@
 
 #include "factory_diags.hpp"
 #include "common/error.hpp"
-#include "openthread/platform/radio.h"
 
 #if OPENTHREAD_CONFIG_DIAG_ENABLE
 
@@ -46,7 +45,6 @@
 #include "common/as_core_type.hpp"
 #include "common/code_utils.hpp"
 #include "common/locator_getters.hpp"
-#include "common/string.hpp"
 #include "instance/instance.hpp"
 #include "radio/radio.hpp"
 #include "utils/parse_cmdline.hpp"
@@ -127,7 +125,7 @@ Error Diags::ProcessEcho(uint8_t aArgsLength, char *aArgs[])
     {
         Output("%s\r\n", aArgs[0]);
     }
-    else if ((aArgsLength == 2) && StringMatch(aArgs[0], "-n"))
+    else if ((aArgsLength == 2) && (strcmp(aArgs[0], "-n") == 0))
     {
         static constexpr uint8_t  kReservedLen  = 1; // 1 byte '\0'
         static constexpr uint16_t kOutputLen    = OPENTHREAD_CONFIG_DIAG_OUTPUT_BUFFER_SIZE;
@@ -217,47 +215,18 @@ Diags::Diags(Instance &aInstance)
     mStats.Clear();
 }
 
-void Diags::ResetTxPacket(void)
-{
-    mTxPacket->mInfo.mTxInfo.mTxDelayBaseTime      = 0;
-    mTxPacket->mInfo.mTxInfo.mTxDelay              = 0;
-    mTxPacket->mInfo.mTxInfo.mMaxCsmaBackoffs      = 0;
-    mTxPacket->mInfo.mTxInfo.mMaxFrameRetries      = 0;
-    mTxPacket->mInfo.mTxInfo.mRxChannelAfterTxDone = mChannel;
-    mTxPacket->mInfo.mTxInfo.mTxPower              = OT_RADIO_POWER_INVALID;
-    mTxPacket->mInfo.mTxInfo.mIsHeaderUpdated      = false;
-    mTxPacket->mInfo.mTxInfo.mIsARetx              = false;
-    mTxPacket->mInfo.mTxInfo.mCsmaCaEnabled        = false;
-    mTxPacket->mInfo.mTxInfo.mCslPresent           = false;
-    mTxPacket->mInfo.mTxInfo.mIsSecurityProcessed  = false;
-}
-
 Error Diags::ProcessFrame(uint8_t aArgsLength, char *aArgs[])
 {
-    Error    error             = kErrorNone;
-    uint16_t size              = OT_RADIO_FRAME_MAX_SIZE;
-    bool     securityProcessed = false;
-
-    if (aArgsLength >= 1)
-    {
-        if (StringMatch(aArgs[0], "-s"))
-        {
-            securityProcessed = true;
-            aArgs++;
-            aArgsLength--;
-        }
-    }
+    Error    error = kErrorNone;
+    uint16_t size  = OT_RADIO_FRAME_MAX_SIZE;
 
     VerifyOrExit(aArgsLength == 1, error = kErrorInvalidArgs);
 
     SuccessOrExit(error = Utils::CmdLineParser::ParseAsHexString(aArgs[0], size, mTxPacket->mPsdu));
     VerifyOrExit(size <= OT_RADIO_FRAME_MAX_SIZE, error = kErrorInvalidArgs);
     VerifyOrExit(size >= OT_RADIO_FRAME_MIN_SIZE, error = kErrorInvalidArgs);
-
-    ResetTxPacket();
-    mTxPacket->mInfo.mTxInfo.mIsSecurityProcessed = securityProcessed;
-    mTxPacket->mLength                            = size;
-    mIsTxPacketSet                                = true;
+    mTxPacket->mLength = size;
+    mIsTxPacketSet     = true;
 
 exit:
     AppendErrorResult(error);
@@ -328,7 +297,7 @@ Error Diags::ProcessRepeat(uint8_t aArgsLength, char *aArgs[])
     VerifyOrExit(otPlatDiagModeGet(), error = kErrorInvalidState);
     VerifyOrExit(aArgsLength > 0, error = kErrorInvalidArgs);
 
-    if (StringMatch(aArgs[0], "stop"))
+    if (strcmp(aArgs[0], "stop") == 0)
     {
         otPlatAlarmMilliStop(&GetInstance());
         mRepeatActive = false;
@@ -445,7 +414,7 @@ Error Diags::ProcessStats(uint8_t aArgsLength, char *aArgs[])
 
     VerifyOrExit(otPlatDiagModeGet(), error = kErrorInvalidState);
 
-    if ((aArgsLength == 1) && StringMatch(aArgs[0], "clear"))
+    if ((aArgsLength == 1) && (strcmp(aArgs[0], "clear") == 0))
     {
         mStats.Clear();
         Output("stats cleared\r\n");
@@ -498,7 +467,6 @@ void Diags::TransmitPacket(void)
 
     if (!mIsTxPacketSet)
     {
-        ResetTxPacket();
         mTxPacket->mLength = mTxLen;
 
         for (uint8_t i = 0; i < mTxLen; i++)
@@ -518,12 +486,12 @@ Error Diags::ProcessRadio(uint8_t aArgsLength, char *aArgs[])
     VerifyOrExit(otPlatDiagModeGet(), error = kErrorInvalidState);
     VerifyOrExit(aArgsLength > 0, error = kErrorInvalidArgs);
 
-    if (StringMatch(aArgs[0], "sleep"))
+    if (strcmp(aArgs[0], "sleep") == 0)
     {
         SuccessOrExit(error = Get<Radio>().Sleep());
         Output("set radio from receive to sleep \r\nstatus 0x%02x\r\n", error);
     }
-    else if (StringMatch(aArgs[0], "receive"))
+    else if (strcmp(aArgs[0], "receive") == 0)
     {
         SuccessOrExit(error = Get<Radio>().Receive(mChannel));
         SuccessOrExit(error = Get<Radio>().SetTransmitPower(mTxPower));
@@ -532,7 +500,7 @@ Error Diags::ProcessRadio(uint8_t aArgsLength, char *aArgs[])
 
         Output("set radio from sleep to receive on channel %d\r\nstatus 0x%02x\r\n", mChannel, error);
     }
-    else if (StringMatch(aArgs[0], "state"))
+    else if (strcmp(aArgs[0], "state") == 0)
     {
         otRadioState state = Get<Radio>().GetState();
 
@@ -639,11 +607,11 @@ Error Diags::ProcessContinuousWave(uint8_t aArgsLength, char *aArgs[])
     VerifyOrExit(otPlatDiagModeGet(), error = kErrorInvalidState);
     VerifyOrExit(aArgsLength > 0, error = kErrorInvalidArgs);
 
-    if (StringMatch(aArgs[0], "start"))
+    if (strcmp(aArgs[0], "start") == 0)
     {
         SuccessOrExit(error = otPlatDiagRadioTransmitCarrier(&GetInstance(), true));
     }
-    else if (StringMatch(aArgs[0], "stop"))
+    else if (strcmp(aArgs[0], "stop") == 0)
     {
         SuccessOrExit(error = otPlatDiagRadioTransmitCarrier(&GetInstance(), false));
     }
@@ -660,11 +628,11 @@ Error Diags::ProcessStream(uint8_t aArgsLength, char *aArgs[])
     VerifyOrExit(otPlatDiagModeGet(), error = kErrorInvalidState);
     VerifyOrExit(aArgsLength > 0, error = kErrorInvalidArgs);
 
-    if (StringMatch(aArgs[0], "start"))
+    if (strcmp(aArgs[0], "start") == 0)
     {
         error = otPlatDiagRadioTransmitStream(&GetInstance(), true);
     }
-    else if (StringMatch(aArgs[0], "stop"))
+    else if (strcmp(aArgs[0], "stop") == 0)
     {
         error = otPlatDiagRadioTransmitStream(&GetInstance(), false);
     }
@@ -754,11 +722,11 @@ Error Diags::ProcessRawPowerSetting(uint8_t aArgsLength, char *aArgs[])
         SuccessOrExit(error = GetRawPowerSetting(setting));
         Output("%s\r\n", setting.ToString().AsCString());
     }
-    else if (StringMatch(aArgs[0], "enable"))
+    else if (strcmp(aArgs[0], "enable") == 0)
     {
         SuccessOrExit(error = otPlatDiagRadioRawPowerSettingEnable(&GetInstance(), true));
     }
-    else if (StringMatch(aArgs[0], "disable"))
+    else if (strcmp(aArgs[0], "disable") == 0)
     {
         SuccessOrExit(error = otPlatDiagRadioRawPowerSettingEnable(&GetInstance(), false));
     }
@@ -782,21 +750,21 @@ Error Diags::ProcessGpio(uint8_t aArgsLength, char *aArgs[])
     bool       level;
     otGpioMode mode;
 
-    if ((aArgsLength == 2) && StringMatch(aArgs[0], "get"))
+    if ((aArgsLength == 2) && (strcmp(aArgs[0], "get") == 0))
     {
         SuccessOrExit(error = ParseLong(aArgs[1], value));
         gpio = static_cast<uint32_t>(value);
         SuccessOrExit(error = otPlatDiagGpioGet(gpio, &level));
         Output("%d\r\n", level);
     }
-    else if ((aArgsLength == 3) && StringMatch(aArgs[0], "set"))
+    else if ((aArgsLength == 3) && (strcmp(aArgs[0], "set") == 0))
     {
         SuccessOrExit(error = ParseLong(aArgs[1], value));
         gpio = static_cast<uint32_t>(value);
         SuccessOrExit(error = ParseBool(aArgs[2], level));
         SuccessOrExit(error = otPlatDiagGpioSet(gpio, level));
     }
-    else if ((aArgsLength >= 2) && StringMatch(aArgs[0], "mode"))
+    else if ((aArgsLength >= 2) && (strcmp(aArgs[0], "mode") == 0))
     {
         SuccessOrExit(error = ParseLong(aArgs[1], value));
         gpio = static_cast<uint32_t>(value);
@@ -813,11 +781,11 @@ Error Diags::ProcessGpio(uint8_t aArgsLength, char *aArgs[])
                 Output("out\r\n");
             }
         }
-        else if ((aArgsLength == 3) && StringMatch(aArgs[2], "in"))
+        else if ((aArgsLength == 3) && (strcmp(aArgs[2], "in") == 0))
         {
             SuccessOrExit(error = otPlatDiagGpioSetMode(gpio, OT_GPIO_MODE_INPUT));
         }
-        else if ((aArgsLength == 3) && StringMatch(aArgs[2], "out"))
+        else if ((aArgsLength == 3) && (strcmp(aArgs[2], "out") == 0))
         {
             SuccessOrExit(error = otPlatDiagGpioSetMode(gpio, OT_GPIO_MODE_OUTPUT));
         }
@@ -914,7 +882,7 @@ Error Diags::ProcessCmd(uint8_t aArgsLength, char *aArgs[])
     // This `rcp` command is for debugging and testing only, building only when NDEBUG is not defined
     // so that it will be excluded from release build.
 #if OPENTHREAD_RADIO && !defined(NDEBUG)
-    if (aArgsLength > 0 && StringMatch(aArgs[0], "rcp"))
+    if (aArgsLength > 0 && !strcmp(aArgs[0], "rcp"))
     {
         aArgs++;
         aArgsLength--;
@@ -929,7 +897,7 @@ Error Diags::ProcessCmd(uint8_t aArgsLength, char *aArgs[])
 
     for (const Command &command : sCommands)
     {
-        if (StringMatch(aArgs[0], command.mName))
+        if (strcmp(aArgs[0], command.mName) == 0)
         {
             error = (this->*command.mCommand)(aArgsLength - 1, (aArgsLength > 1) ? &aArgs[1] : nullptr);
             ExitNow();

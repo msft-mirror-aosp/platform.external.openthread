@@ -30,7 +30,6 @@
 #define OT_POSIX_PLATFORM_CONFIG_FILE_HPP_
 
 #include <assert.h>
-#include <limits.h>
 #include <stdint.h>
 #include <openthread/error.h>
 
@@ -116,7 +115,7 @@ private:
     const char               *kCommentDelimiter = "#";
     const char               *kSwapSuffix       = ".swap";
     static constexpr uint16_t kLineMaxSize      = 512;
-    static constexpr uint16_t kFilePathMaxSize  = PATH_MAX;
+    static constexpr uint16_t kFileNameMaxSize  = 255;
 
     void Strip(char *aString) const;
 

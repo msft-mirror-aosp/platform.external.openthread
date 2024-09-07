@@ -484,7 +484,7 @@ exit:
 
 void SecureTransport::Close(void)
 {
-    Disconnect(kDisconnectedLocalClosed);
+    Disconnect();
 
     SetState(kStateClosed);
     mTimerSet = false;
@@ -494,15 +494,12 @@ void SecureTransport::Close(void)
     mTimer.Stop();
 }
 
-void SecureTransport::Disconnect(void) { Disconnect(kDisconnectedLocalClosed); }
-
-void SecureTransport::Disconnect(ConnectEvent aEvent)
+void SecureTransport::Disconnect(void)
 {
     VerifyOrExit(IsStateConnectingOrConnected());
 
     mbedtls_ssl_close_notify(&mSsl);
     SetState(kStateCloseNotify);
-    mConnectEvent = aEvent;
     mTimer.Start(kGuardTimeNewConnectionMilli);
 
     mMessageInfo.Clear();
@@ -1046,24 +1043,23 @@ void SecureTransport::HandleTimer(void)
         if ((mMaxConnectionAttempts > 0) && (mRemainingConnectionAttempts == 0))
         {
             Close();
-            mConnectEvent = kDisconnectedMaxAttempts;
+            mConnectedCallback.InvokeIfSet(false);
             mAutoCloseCallback.InvokeIfSet();
         }
         else
         {
             SetState(kStateOpen);
             mTimer.Stop();
+            mConnectedCallback.InvokeIfSet(false);
         }
-        mConnectedCallback.InvokeIfSet(mConnectEvent);
     }
 }
 
 void SecureTransport::Process(void)
 {
-    uint8_t      buf[OPENTHREAD_CONFIG_DTLS_MAX_CONTENT_LEN];
-    bool         shouldDisconnect = false;
-    int          rval;
-    ConnectEvent event;
+    uint8_t buf[OPENTHREAD_CONFIG_DTLS_MAX_CONTENT_LEN];
+    bool    shouldDisconnect = false;
+    int     rval;
 
     while (IsStateConnectingOrConnected())
     {
@@ -1074,8 +1070,7 @@ void SecureTransport::Process(void)
             if (mSsl.MBEDTLS_PRIVATE(state) == MBEDTLS_SSL_HANDSHAKE_OVER)
             {
                 SetState(kStateConnected);
-                mConnectEvent = kConnected;
-                mConnectedCallback.InvokeIfSet(mConnectEvent);
+                mConnectedCallback.InvokeIfSet(true);
             }
         }
         else
@@ -1097,7 +1092,6 @@ void SecureTransport::Process(void)
             {
             case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
                 mbedtls_ssl_close_notify(&mSsl);
-                event = kDisconnectedPeerClosed;
                 ExitNow(shouldDisconnect = true);
                 OT_UNREACHABLE_CODE(break);
 
@@ -1106,7 +1100,6 @@ void SecureTransport::Process(void)
 
             case MBEDTLS_ERR_SSL_FATAL_ALERT_MESSAGE:
                 mbedtls_ssl_close_notify(&mSsl);
-                event = kDisconnectedError;
                 ExitNow(shouldDisconnect = true);
                 OT_UNREACHABLE_CODE(break);
 
@@ -1115,7 +1108,6 @@ void SecureTransport::Process(void)
                 {
                     mbedtls_ssl_send_alert_message(&mSsl, MBEDTLS_SSL_ALERT_LEVEL_FATAL,
                                                    MBEDTLS_SSL_ALERT_MSG_BAD_RECORD_MAC);
-                    event = kDisconnectedError;
                     ExitNow(shouldDisconnect = true);
                 }
 
@@ -1126,7 +1118,6 @@ void SecureTransport::Process(void)
                 {
                     mbedtls_ssl_send_alert_message(&mSsl, MBEDTLS_SSL_ALERT_LEVEL_FATAL,
                                                    MBEDTLS_SSL_ALERT_MSG_HANDSHAKE_FAILURE);
-                    event = kDisconnectedError;
                     ExitNow(shouldDisconnect = true);
                 }
 
@@ -1146,7 +1137,7 @@ exit:
 
     if (shouldDisconnect)
     {
-        Disconnect(event);
+        Disconnect();
     }
 }
 

@@ -154,18 +154,6 @@ bool StringEndsWith(const char *aString, char aChar);
 bool StringEndsWith(const char *aString, const char *aSubString, StringMatchMode aMode = kStringExactMatch);
 
 /**
- * Checks whether or not two null-terminated strings match exactly.
- *
- * @param[in] aFirstString   A pointer to the first string.
- * @param[in] aSecondString  A pointer to the second string.
- *
- * @retval TRUE   If @p aFirstString matches @p aSecondString.
- * @retval FALSE  If @p aFirstString does not match @p aSecondString.
- *
- */
-bool StringMatch(const char *aFirstString, const char *aSecondString);
-
-/**
  * Checks whether or not two null-terminated strings match.
  *
  * @param[in] aFirstString   A pointer to the first string.
@@ -176,7 +164,7 @@ bool StringMatch(const char *aFirstString, const char *aSecondString);
  * @retval FALSE  If @p aFirstString does not match @p aSecondString using match mode @p aMode.
  *
  */
-bool StringMatch(const char *aFirstString, const char *aSecondString, StringMatchMode aMode);
+bool StringMatch(const char *aFirstString, const char *aSecondString, StringMatchMode aMode = kStringExactMatch);
 
 /**
  * Copies a string into a given target buffer with a given size if it fits.
@@ -352,7 +340,7 @@ Error ParseDigit(char aDigitChar, uint8_t &aValue);
 Error ParseHexDigit(char aHexChar, uint8_t &aValue);
 
 /**
- * Converts a boolean to "yes" or "no" string.
+ * Coverts a boolean to "yes" or "no" string.
  *
  * @param[in] aBool  A boolean value to convert.
  *
