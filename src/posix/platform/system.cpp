@@ -65,7 +65,6 @@ bool        gDryRun   = false;
 
 CoprocessorType sCoprocessorType = OT_COPROCESSOR_UNKNOWN;
 
-#if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE || OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
 static void processStateChange(otChangedFlags aFlags, void *aContext)
 {
     otInstance *instance = static_cast<otInstance *>(aContext);
@@ -80,8 +79,9 @@ static void processStateChange(otChangedFlags aFlags, void *aContext)
 #if OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
     ot::Posix::InfraNetif::Get().HandleBackboneStateChange(instance, aFlags);
 #endif
+
+    platformRadioHandleStateChange(instance, aFlags);
 }
-#endif
 
 static const char *get802154RadioUrl(const otPlatformCoprocessorUrls &aUrls)
 {
@@ -155,6 +155,9 @@ void platformInitRcpMode(otPlatformConfig *aPlatformConfig)
 
 #if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
     platformNetifInit(aPlatformConfig);
+#endif
+#if OPENTHREAD_CONFIG_DNS_UPSTREAM_QUERY_ENABLE
+    platformResolverInit();
 #endif
 
 #if OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE
@@ -250,9 +253,7 @@ void platformSetUp(otPlatformConfig *aPlatformConfig)
     ot::Posix::Daemon::Get().SetUp();
 #endif
 
-#if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE || OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE
     SuccessOrDie(otSetStateChangedCallback(gInstance, processStateChange, gInstance));
-#endif
 
 exit:
     return;
@@ -415,6 +416,9 @@ void otSysMainloopUpdate(otInstance *aInstance, otSysMainloopContext *aMainloop)
 #if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
     platformTrelUpdateFdSet(aMainloop);
 #endif
+#if OPENTHREAD_CONFIG_DNS_UPSTREAM_QUERY_ENABLE
+    platformResolverUpdateFdSet(aMainloop);
+#endif
 
     if (otTaskletsArePending(aInstance))
     {
@@ -482,6 +486,9 @@ void otSysMainloopProcess(otInstance *aInstance, const otSysMainloopContext *aMa
     platformAlarmProcess(aInstance);
 #if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
     platformNetifProcess(aMainloop);
+#endif
+#if OPENTHREAD_CONFIG_DNS_UPSTREAM_QUERY_ENABLE
+    platformResolverProcess(aMainloop);
 #endif
 }
 
