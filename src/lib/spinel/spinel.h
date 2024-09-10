@@ -522,7 +522,7 @@ enum
 
     /// Generic failure to associate with other peers.
     /**
-     *  This status error should not be used by implementors if
+     *  This status error should not be used by implementers if
      *  enough information is available to determine that one of the
      *  later join failure status codes would be more accurate.
      *
@@ -2370,6 +2370,12 @@ enum
      */
     SPINEL_PROP_NET_PSKC = SPINEL_PROP_NET__BEGIN + 11,
 
+    /// Instruct NCP to leave the current network gracefully
+    /** Format Empty - Write only
+     *
+     */
+    SPINEL_PROP_NET_LEAVE_GRACEFULLY = SPINEL_PROP_NET__BEGIN + 12,
+
     SPINEL_PROP_NET__END = 0x50,
 
     SPINEL_PROP_NET_EXT__BEGIN = 0x1400,
@@ -3382,6 +3388,49 @@ enum
      */
     SPINEL_PROP_THREAD_BACKBONE_ROUTER_LOCAL_REGISTRATION_JITTER = SPINEL_PROP_THREAD_EXT__BEGIN + 59,
 
+    /// Thread Active Operational Dataset in raw TLVs format.
+    /** Format: `D` - Read-Write
+     *
+     * This property provides access to the current Thread Active Operational Dataset. A Thread device maintains the
+     * Operational Dataset that it has stored locally and the one currently in use by the partition to which it is
+     * attached. This property corresponds to the locally stored Dataset on the device.
+     *
+     * On write, any unknown/unsupported TLVs must be ignored.
+     *
+     */
+    SPINEL_PROP_THREAD_ACTIVE_DATASET_TLVS = SPINEL_PROP_THREAD_EXT__BEGIN + 60,
+
+    /// Thread Pending Operational Dataset in raw TLVs format.
+    /** Format: `D` - Read-Write
+     *
+     * This property provides access to the current locally stored Pending Operational Dataset.
+     *
+     * The formatting of this property follows the same rules as in SPINEL_PROP_THREAD_ACTIVE_DATASET_TLVS.
+     *
+     * On write, any unknown/unsupported TLVs must be ignored.
+     *
+     */
+    SPINEL_PROP_THREAD_PENDING_DATASET_TLVS = SPINEL_PROP_THREAD_EXT__BEGIN + 61,
+
+    /// Send MGMT_SET Thread Pending Operational Dataset (in TLV format).
+    /** Format: `D` - Write only
+     *
+     * This is write-only property. When written, it triggers a MGMT_PENDING_SET meshcop command to be sent to leader
+     * with the given Dataset.
+     *
+     * When setting this property, the spinel frame response will be:
+     * 1. A `LAST_STATUS` with the status of the transmission of MGMT_PENDING_SET command if it fails.
+     * 2. A `SPINEL_PROP_THREAD_MGMT_SET_PENDING_DATASET_TLVS` with no content.
+     *
+     * On response reception or timeout, another notification will be sent to the host:
+     * A `SPINEL_PROP_THREAD_MGMT_SET_PENDING_DATASET_TLVS` with a spinel_status_t indicating
+     * the result of MGMT_SET_PENDING.
+     *
+     * On write, any unknown/unsupported TLVs must be ignored.
+     *
+     */
+    SPINEL_PROP_THREAD_MGMT_SET_PENDING_DATASET_TLVS = SPINEL_PROP_THREAD_EXT__BEGIN + 62,
+
     SPINEL_PROP_THREAD_EXT__END = 0x1600,
 
     SPINEL_PROP_IPV6__BEGIN = 0x60,
@@ -3418,8 +3467,8 @@ enum
      *
      *  `6`: IPv6 Address
      *  `C`: Network Prefix Length (in bits)
-     *  `L`: Valid Lifetime
      *  `L`: Preferred Lifetime
+     *  `L`: Valid Lifetime
      *
      */
     SPINEL_PROP_IPV6_ADDRESS_TABLE = SPINEL_PROP_IPV6__BEGIN + 3,

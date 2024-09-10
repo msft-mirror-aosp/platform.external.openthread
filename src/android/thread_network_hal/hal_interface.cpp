@@ -43,6 +43,8 @@
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
 
+#include "common/code_utils.hpp"
+
 namespace ot {
 namespace Posix {
 using ::aidl::android::hardware::threadnetwork::IThreadChip;
@@ -183,8 +185,8 @@ otError HalInterface::WaitForFrame(uint64_t aTimeoutUs)
 
     VerifyOrExit(mBinderFd >= 0, error = OT_ERROR_FAILED);
 
-    timeout.tv_sec  = static_cast<time_t>(aTimeoutUs / US_PER_S);
-    timeout.tv_usec = static_cast<suseconds_t>(aTimeoutUs % US_PER_S);
+    timeout.tv_sec  = static_cast<time_t>(aTimeoutUs / OT_US_PER_S);
+    timeout.tv_usec = static_cast<suseconds_t>(aTimeoutUs % OT_US_PER_S);
 
     FD_ZERO(&readFdSet);
     FD_SET(mBinderFd, &readFdSet);

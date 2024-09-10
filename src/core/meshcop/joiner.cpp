@@ -382,16 +382,16 @@ exit:
     return error;
 }
 
-void Joiner::HandleSecureCoapClientConnect(bool aConnected, void *aContext)
+void Joiner::HandleSecureCoapClientConnect(SecureTransport::ConnectEvent aEvent, void *aContext)
 {
-    static_cast<Joiner *>(aContext)->HandleSecureCoapClientConnect(aConnected);
+    static_cast<Joiner *>(aContext)->HandleSecureCoapClientConnect(aEvent);
 }
 
-void Joiner::HandleSecureCoapClientConnect(bool aConnected)
+void Joiner::HandleSecureCoapClientConnect(SecureTransport::ConnectEvent aEvent)
 {
     VerifyOrExit(mState == kStateConnect);
 
-    if (aConnected)
+    if (aEvent == SecureTransport::kConnected)
     {
         SetState(kStateConnected);
         SendJoinerFinalize();
@@ -528,12 +528,12 @@ template <> void Joiner::HandleTmf<kUriJoinerEntrust>(Coap::Message &aMessage, c
 
     datasetInfo.Clear();
 
-    SuccessOrExit(error = Tlv::Find<NetworkKeyTlv>(aMessage, datasetInfo.UpdateNetworkKey()));
+    SuccessOrExit(error = Tlv::Find<NetworkKeyTlv>(aMessage, datasetInfo.Update<Dataset::kNetworkKey>()));
 
-    datasetInfo.SetChannel(Get<Mac::Mac>().GetPanChannel());
-    datasetInfo.SetPanId(Get<Mac::Mac>().GetPanId());
+    datasetInfo.Set<Dataset::kChannel>(Get<Mac::Mac>().GetPanChannel());
+    datasetInfo.Set<Dataset::kPanId>(Get<Mac::Mac>().GetPanId());
 
-    IgnoreError(Get<ActiveDatasetManager>().Save(datasetInfo));
+    Get<ActiveDatasetManager>().SaveLocal(datasetInfo);
 
     LogInfo("Joiner successful!");
 

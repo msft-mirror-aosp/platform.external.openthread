@@ -258,6 +258,9 @@ NcpBase::NcpBase(Instance **aInstances, uint8_t aCount)
 
         OT_ASSERT(i + skipped <= SPINEL_HEADER_IID_MAX);
         mInstances[i + skipped] = aInstances[i];
+#if OPENTHREAD_CONFIG_DIAG_ENABLE
+        otDiagSetOutputCallback(mInstances[i + skipped], &NcpBase::HandleDiagOutput_Jump, this);
+#endif
     }
 }
 #endif // OPENTHREAD_CONFIG_MULTIPAN_RCP_ENABLE  && OPENTHREAD_RADIO
@@ -312,7 +315,12 @@ NcpBase::NcpBase(Instance *aInstance)
     , mRxSpinelOutOfOrderTidCounter(0)
     , mTxSpinelFrameCounter(0)
     , mDidInitialUpdates(false)
+    , mDatasetSendMgmtPendingSetResult(SPINEL_STATUS_OK)
     , mLogTimestampBase(0)
+#if OPENTHREAD_CONFIG_DIAG_ENABLE
+    , mDiagOutput(nullptr)
+    , mDiagOutputLen(0)
+#endif
 {
     OT_ASSERT(mInstance != nullptr);
 
@@ -354,6 +362,9 @@ NcpBase::NcpBase(Instance *aInstance)
     otSrpClientSetCallback(mInstance, HandleSrpClientCallback, this);
 #endif
 #endif // OPENTHREAD_MTD || OPENTHREAD_FTD
+#if OPENTHREAD_CONFIG_DIAG_ENABLE
+    otDiagSetOutputCallback(mInstance, &NcpBase::HandleDiagOutput_Jump, this);
+#endif
     mChangedPropsSet.AddLastStatus(SPINEL_STATUS_RESET_UNKNOWN);
     mUpdateChangedPropsTask.Post();
 
@@ -1418,12 +1429,11 @@ exit:
 // ----------------------------------------------------------------------------
 
 #if OPENTHREAD_CONFIG_DIAG_ENABLE
-
 otError NcpBase::HandlePropertySet_SPINEL_PROP_NEST_STREAM_MFG(uint8_t aHeader)
 {
-    const char *string = nullptr;
-    char        output[OPENTHREAD_CONFIG_DIAG_OUTPUT_BUFFER_SIZE];
-    otError     error = OT_ERROR_NONE;
+    const char *string                                            = nullptr;
+    char        output[OPENTHREAD_CONFIG_DIAG_OUTPUT_BUFFER_SIZE] = {0};
+    otError     error                                             = OT_ERROR_NONE;
 
     error = mDecoder.ReadUtf8(string);
 
@@ -1438,7 +1448,10 @@ otError NcpBase::HandlePropertySet_SPINEL_PROP_NEST_STREAM_MFG(uint8_t aHeader)
     }
 #endif
 
-    SuccessOrExit(error = otDiagProcessCmdLine(mInstance, string, output, sizeof(output)));
+    mDiagOutput    = output;
+    mDiagOutputLen = sizeof(output);
+
+    SuccessOrExit(error = otDiagProcessCmdLine(mInstance, string));
 
     // Prepare the response
     SuccessOrExit(error = mEncoder.BeginFrame(aHeader, SPINEL_CMD_PROP_VALUE_IS, SPINEL_PROP_NEST_STREAM_MFG));
@@ -1446,7 +1459,44 @@ otError NcpBase::HandlePropertySet_SPINEL_PROP_NEST_STREAM_MFG(uint8_t aHeader)
     SuccessOrExit(error = mEncoder.EndFrame());
 
 exit:
+    mDiagOutput    = nullptr;
+    mDiagOutputLen = 0;
+
     return error;
+}
+
+void NcpBase::HandleDiagOutput_Jump(const char *aFormat, va_list aArguments, void *aContext)
+{
+    static_cast<NcpBase *>(aContext)->HandleDiagOutput(aFormat, aArguments);
+}
+
+void NcpBase::HandleDiagOutput(const char *aFormat, va_list aArguments)
+{
+    int charsWritten;
+
+    if (mDiagOutput != nullptr)
+    {
+        charsWritten = vsnprintf(mDiagOutput, mDiagOutputLen, aFormat, aArguments);
+        VerifyOrExit(charsWritten > 0);
+        charsWritten = (mDiagOutputLen <= charsWritten) ? mDiagOutputLen : charsWritten;
+        mDiagOutput += charsWritten;
+        mDiagOutputLen -= charsWritten;
+    }
+    else
+    {
+        uint8_t header = SPINEL_HEADER_FLAG | SPINEL_HEADER_IID_0;
+        char    output[OPENTHREAD_CONFIG_DIAG_OUTPUT_BUFFER_SIZE];
+
+        charsWritten = vsnprintf(output, sizeof(output), aFormat, aArguments);
+        VerifyOrExit(charsWritten >= 0);
+
+        SuccessOrExit(mEncoder.BeginFrame(header, SPINEL_CMD_PROP_VALUE_IS, SPINEL_PROP_NEST_STREAM_MFG));
+        SuccessOrExit(mEncoder.WriteUtf8(output));
+        SuccessOrExit(mEncoder.EndFrame());
+    }
+
+exit:
+    return;
 }
 
 #endif // OPENTHREAD_CONFIG_DIAG_ENABLE
