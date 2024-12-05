@@ -351,13 +351,16 @@ static_assert(OPENTHREAD_CONFIG_NUM_MESSAGE_BUFFERS * (32 * sizeof(void *)) ==
 // Enable the external heap.
 #define OPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE 1
 
-// Disable TREL as it's not yet supported.
-#define OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE 0
+// Enable TREL.
+#define OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE 1
 
 // Enable Link Metrics subject feature for Thread certification test.
 #define OPENTHREAD_CONFIG_MLE_LINK_METRICS_SUBJECT_ENABLE 1
 
 // Enable Link Metrics initiator feature for Thread certification test.
 #define OPENTHREAD_CONFIG_MLE_LINK_METRICS_INITIATOR_ENABLE 1
+
+// Sets microseconds ahead should MAC deliver CSL frame to SubMac.
+#define OPENTHREAD_CONFIG_MAC_CSL_REQUEST_AHEAD_US 4000
 
 #endif // OPENTHREAD_CORE_ANDROID_CONFIG_H_
