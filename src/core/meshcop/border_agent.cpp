@@ -670,6 +670,7 @@ void BorderAgent::HandleConnected(SecureTransport::ConnectEvent aEvent)
         if (mUsingEphemeralKey)
         {
             mCounters.mEpskcSecureSessionSuccesses++;
+            mEphemeralKeyTask.Post();
         }
         else
 #endif
@@ -687,11 +688,12 @@ void BorderAgent::HandleConnected(SecureTransport::ConnectEvent aEvent)
         if (mUsingEphemeralKey)
         {
             RestartAfterRemovingEphemeralKey();
+
             if (aEvent == SecureTransport::kDisconnectedError)
             {
                 mCounters.mEpskcSecureSessionFailures++;
             }
-            if (aEvent == SecureTransport::kDisconnectedPeerClosed)
+            else if (aEvent == SecureTransport::kDisconnectedPeerClosed)
             {
                 mCounters.mEpskcDeactivationDisconnects++;
             }
@@ -701,6 +703,7 @@ void BorderAgent::HandleConnected(SecureTransport::ConnectEvent aEvent)
         {
             mState        = kStateStarted;
             mUdpProxyPort = 0;
+
             if (aEvent == SecureTransport::kDisconnectedError)
             {
                 mCounters.mPskcSecureSessionFailures++;
@@ -788,6 +791,16 @@ exit:
     return;
 }
 
+void BorderAgent::Disconnect(void)
+{
+    VerifyOrExit(mState == kStateConnected || mState == kStateAccepted);
+
+    Get<Tmf::SecureAgent>().Disconnect();
+
+exit:
+    return;
+}
+
 #if OPENTHREAD_CONFIG_BORDER_AGENT_EPHEMERAL_KEY_ENABLE
 
 Error BorderAgent::SetEphemeralKey(const char *aKeyString, uint32_t aTimeout, uint16_t aUdpPort)
@@ -857,16 +870,7 @@ void BorderAgent::ClearEphemeralKey(void)
 
     LogInfo("Clearing ephemeral key");
 
-    if (mEphemeralKeyTimer.IsRunning())
-    {
-        mCounters.mEpskcDeactivationClears++;
-    }
-    else
-    {
-        mCounters.mEpskcDeactivationTimeouts++;
-    }
-
-    mEphemeralKeyTimer.Stop();
+    mCounters.mEpskcDeactivationClears++;
 
     switch (mState)
     {
@@ -877,9 +881,10 @@ void BorderAgent::ClearEphemeralKey(void)
     case kStateStopped:
     case kStateConnected:
     case kStateAccepted:
-        // If there is an active commissioner connection, we wait till
-        // it gets disconnected before removing ephemeral key and
-        // restarting the agent.
+        // If a commissioner connection is currently active, we'll
+        // wait for it to disconnect or for the ephemeral key timeout
+        // or `kKeepAliveTimeout` to expire before removing the key
+        // and restarting the agent.
         break;
     }
 
@@ -890,7 +895,8 @@ exit:
 void BorderAgent::HandleEphemeralKeyTimeout(void)
 {
     LogInfo("Ephemeral key timed out");
-    ClearEphemeralKey();
+    mCounters.mEpskcDeactivationTimeouts++;
+    RestartAfterRemovingEphemeralKey();
 }
 
 void BorderAgent::InvokeEphemeralKeyCallback(void) { mEphemeralKeyCallback.InvokeIfSet(); }
@@ -911,8 +917,8 @@ void BorderAgent::HandleSecureAgentStopped(void *aContext)
 void BorderAgent::HandleSecureAgentStopped(void)
 {
     LogInfo("Reached max allowed connection attempts with ephemeral key");
-    RestartAfterRemovingEphemeralKey();
     mCounters.mEpskcDeactivationMaxAttempts++;
+    RestartAfterRemovingEphemeralKey();
 }
 
 #endif // OPENTHREAD_CONFIG_BORDER_AGENT_EPHEMERAL_KEY_ENABLE

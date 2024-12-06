@@ -372,6 +372,15 @@ Started
 Done
 ```
 
+### ba disconnect
+
+Disconnects border agent from any active secure sessions.
+
+```bash
+> ba disconnect
+Done
+```
+
 ### ba ephemeralkey
 
 Indicates if an ephemeral key is active.
@@ -407,7 +416,7 @@ The `port` specifies the UDP port to use with the ephemeral key. If UDP port is 
 
 Setting the ephemeral key again before a previously set one is timed out, will replace the previous one.
 
-While the timeout interval is in effect, the ephemeral key can be used only once by an external commissioner to connect. Once the commissioner disconnects, the ephemeral key is cleared, and Border Agent reverts to using PSKc.
+During the timeout interval, the ephemeral key can be used only once by an external commissioner to establish a connection. After the commissioner disconnects, the ephemeral key is cleared, and the Border Agent reverts to using PSKc. If the timeout expires while a commissioner is still connected, the session will be terminated, and the Border Agent will cease using the ephemeral key and revert to PSKc.
 
 ```bash
 > ba ephemeralkey set Z10X20g3J15w1000P60m16 5000 1234
@@ -3945,6 +3954,16 @@ Done
 > trel peers list
 001 ExtAddr:5e5785ba3a63adb9 ExtPanId:f0d9c001f00d2e43 SockAddr:[fe80:0:0:0:cc79:2a29:d311:1aea]:9202
 002 ExtAddr:ce792a29d3111aea ExtPanId:dead00beef00cafe SockAddr:[fe80:0:0:0:5c57:85ba:3a63:adb9]:9203
+Done
+```
+
+### trel port
+
+Get the TREL UDP port number.
+
+```bash
+> trel port
+49154
 Done
 ```
 
