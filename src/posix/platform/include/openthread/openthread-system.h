@@ -43,6 +43,7 @@
 
 #include <openthread/error.h>
 #include <openthread/instance.h>
+#include <openthread/ip6.h>
 #include <openthread/platform/misc.h>
 
 #include "lib/spinel/coprocessor_type.h"
@@ -310,6 +311,40 @@ bool otSysInfraIfIsRunning(void);
  *
  */
 void otSysCliInitUsingDaemon(otInstance *aInstance);
+
+/**
+ * Sets whether to retrieve upstream DNS servers from "resolv.conf".
+ *
+ * @param[in] aEnabled  TRUE if enable retrieving upstream DNS servers from "resolv.conf", FALSE otherwise.
+ *
+ */
+void otSysUpstreamDnsServerSetResolvConfEnabled(bool aEnabled);
+
+/**
+ * Sets the upstream DNS server list.
+ *
+ * @param[in] aUpstreamDnsServers  A pointer to the list of upstream DNS server addresses. Each address could be an IPv6
+ *                                 address or an IPv4-mapped IPv6 address.
+ * @param[in] aNumServers          The number of upstream DNS servers.
+ *
+ */
+void otSysUpstreamDnsSetServerList(const otIp6Address *aUpstreamDnsServers, int aNumServers);
+
+/**
+ * Initializes TREL on the given interface.
+ *
+ * After this call, TREL is ready to be enabled on the interface. Callers need to make sure TREL is disabled prior
+ * to this call.
+ */
+void otSysTrelInit(const char *aInterfaceName);
+
+/**
+ * Deinitializes TREL.
+ *
+ * After this call, TREL is deinitialized. It's ready to be initialized on any given interface. Callers need to
+ * make sure TREL is disabled prior to this call.
+ */
+void otSysTrelDeinit(void);
 
 #ifdef __cplusplus
 } // end of extern "C"
