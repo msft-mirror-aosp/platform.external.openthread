@@ -110,6 +110,38 @@ typedef enum otBorderAgentState
     OT_BORDER_AGENT_STATE_ACTIVE  = 2, ///< Border agent is connected with external commissioner.
 } otBorderAgentState;
 
+typedef struct otBorderAgentCounters
+{
+    uint32_t mEpskcActivations;              ///< The number of ePSKc activations
+    uint32_t mEpskcDeactivationClears;       ///< The number of ePSKc deactivations via API
+    uint32_t mEpskcDeactivationTimeouts;     ///< The number of ePSKc deactivations due to timeout
+    uint32_t mEpskcDeactivationMaxAttempts;  ///< The number of ePSKc deactivations due to reached max attempts
+    uint32_t mEpskcDeactivationDisconnects;  ///< The number of ePSKc deactivations due to commissioner disconnected
+    uint32_t mEpskcInvalidBaStateErrors;     ///< The number of invalid border agent state errors at ePSKc activation
+    uint32_t mEpskcInvalidArgsErrors;        ///< The number of invalid args errors at ePSKc activation
+    uint32_t mEpskcStartSecureSessionErrors; ///< The number of start secure session errors at ePSKc activation
+    uint32_t mEpskcSecureSessionSuccesses;   ///< The number of established secure sessions with ePSKc
+    uint32_t mEpskcSecureSessionFailures;    ///< The number of failed secure sessions with ePSKc
+    uint32_t mEpskcCommissionerPetitions;    ///< The number of successful commissioner petitions with ePSKc
+
+    uint32_t mPskcSecureSessionSuccesses; ///< The number of established secure sessions with PSKc
+    uint32_t mPskcSecureSessionFailures;  ///< The number of failed secure sessions with PSKc
+    uint32_t mPskcCommissionerPetitions;  ///< The number of successful commissioner petitions with PSKc
+
+    uint32_t mMgmtActiveGets;  ///< The number of MGMT_ACTIVE_GET.req sent over secure sessions
+    uint32_t mMgmtPendingGets; ///< The number of MGMT_PENDING_GET.req sent over secure sessions
+} otBorderAgentCounters;
+
+/**
+ * Gets the counters of the Thread Border Agent.
+ *
+ * @param[in]  aInstance  A pointer to an OpenThread instance.
+ *
+ * @returns A pointer to the Border Agent counters.
+ *
+ */
+const otBorderAgentCounters *otBorderAgentGetCounters(otInstance *aInstance);
+
 /**
  * Gets the #otBorderAgentState of the Thread Border Agent role.
  *
@@ -185,9 +217,10 @@ otError otBorderAgentSetId(otInstance *aInstance, const otBorderAgentId *aId);
  * Setting the ephemeral key again before a previously set key has timed out will replace the previously set key and
  * reset the timeout.
  *
- * While the timeout interval is in effect, the ephemeral key can be used only once by an external commissioner to
- * connect. Once the commissioner disconnects, the ephemeral key is cleared, and the Border Agent reverts to using
- * PSKc.
+ * During the timeout interval, the ephemeral key can be used only once by an external commissioner to establish a
+ * connection. After the commissioner disconnects, the ephemeral key is cleared, and the Border Agent reverts to
+ * using PSKc. If the timeout expires while a commissioner is still connected, the session will be terminated, and the
+ * Border Agent will cease using the ephemeral key and revert to PSKc.
  *
  * @param[in] aInstance    The OpenThread instance.
  * @param[in] aKeyString   The ephemeral key string (used as PSK excluding the trailing null `\0` character).
@@ -220,7 +253,7 @@ otError otBorderAgentSetEphemeralKey(otInstance *aInstance,
  *
  * If a commissioner is connected using the ephemeral key and is currently active, calling this function does not
  * change its state. In this case the `otBorderAgentIsEphemeralKeyActive()` will continue to return `TRUE` until the
- * commissioner disconnects.
+ * commissioner disconnects, or the ephemeral key timeout expires.
  *
  * @param[in] aInstance    The OpenThread instance.
  *
@@ -247,6 +280,9 @@ bool otBorderAgentIsEphemeralKeyActive(otInstance *aInstance);
  *
  * - The Border Agent starts using an ephemeral key.
  * - Any parameter related to the ephemeral key, such as the port number, changes.
+ * - A commissioner candidate successfully establishes a secure session with the Border Agent using the ephemeral key.
+ *   This situation can be identified by `otBorderAgentGetState()` being `OT_BORDER_AGENT_STATE_ACTIVE` (this event
+ *   can be used to stop advertising the mDNS service "_meshcop-e._udp").
  * - The Border Agent stops using the ephemeral key due to:
  *   - A direct call to `otBorderAgentClearEphemeralKey()`.
  *   - The ephemeral key timing out.
@@ -275,6 +311,19 @@ typedef void (*otBorderAgentEphemeralKeyCallback)(void *aContext);
 void otBorderAgentSetEphemeralKeyCallback(otInstance                       *aInstance,
                                           otBorderAgentEphemeralKeyCallback aCallback,
                                           void                             *aContext);
+
+/**
+ * Disconnects the Border Agent from any active secure sessions.
+ *
+ * If Border Agent is connected to a commissioner candidate with ephemeral key, calling this API
+ * will cause the ephemeral key to be cleared after the session is disconnected.
+ *
+ * The Border Agent state may not change immediately upon calling this method. The state will be
+ * updated when the connection update is notified with a delay.
+ *
+ * @param[in] aInstance    The OpenThread instance.
+ */
+void otBorderAgentDisconnect(otInstance *aInstance);
 
 /**
  * @}
